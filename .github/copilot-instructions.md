@@ -43,9 +43,5 @@ auto-reconnecting MQTT-over-TLS session to the Qualithm gateway.
 
 ## Validate
 
-```sh
-bun run typecheck    # tsc -p tsconfig.node.json --noEmit
-bun run lint         # eslint .  (bun run lint:fix to autofix)
-bun run format       # prettier --check .  (format:fix to write)
-bun run test         # vitest run src/__tests__/unit
-```
+See [.github/instructions/checks.instructions.md](.github/instructions/checks.instructions.md)
+(synced from dx) for the exact commands this repo's CI enforces.
