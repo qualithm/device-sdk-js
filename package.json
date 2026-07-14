@@ -27,6 +27,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "qualithm-device": "./dist/bin/qualithm-device.js"
+  },
   "exports": {
     ".": {
       "bun": "./dist/index.js",
