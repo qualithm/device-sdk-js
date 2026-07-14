@@ -13,12 +13,22 @@ export { claimDevice } from "./claim.js"
 export type { DeviceKeyMaterial } from "./csr.js"
 export { generateDeviceCsr } from "./csr.js"
 
+// Certificate enrollment
+export type { EnrollRequest } from "./enroll.js"
+export { enrollDeviceCertificate } from "./enroll.js"
+
 // Device
 export type { ErrorListener, MessageListener, StateListener } from "./device.js"
 export { Device } from "./device.js"
 
 // Errors
-export { ClaimError, ConnectionError, CredentialError, QualithmDeviceError } from "./errors.js"
+export {
+  ClaimError,
+  ConnectionError,
+  CredentialError,
+  EnrollError,
+  QualithmDeviceError
+} from "./errors.js"
 
 // Stores
 export { createFileCredentialStore, createMemoryCredentialStore } from "./store.js"

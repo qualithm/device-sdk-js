@@ -16,6 +16,7 @@ const DEVICE_ERROR_TAG = "QualithmDeviceError" as const
 const CLAIM_ERROR_TAG = "ClaimError" as const
 const CREDENTIAL_ERROR_TAG = "CredentialError" as const
 const CONNECTION_ERROR_TAG = "ConnectionError" as const
+const ENROLL_ERROR_TAG = "EnrollError" as const
 
 /** Base error for all device SDK errors. */
 export class QualithmDeviceError extends Error {
@@ -82,5 +83,25 @@ export class ConnectionError extends QualithmDeviceError {
   /** Type-narrowing check for ConnectionError. */
   static override isError(value: unknown): value is ConnectionError {
     return value instanceof ConnectionError
+  }
+}
+
+/** Failure enrolling for an mTLS certificate credential via CSR submission. */
+export class EnrollError extends QualithmDeviceError {
+  /** Discriminant tag — always `"EnrollError"`. */
+  override readonly tag = ENROLL_ERROR_TAG
+
+  /** HTTP status returned by the provisioning endpoint, if any. */
+  readonly status: number | undefined
+
+  constructor(message: string, options?: ErrorOptions & { status?: number }) {
+    super(message, options)
+    this.name = "EnrollError"
+    this.status = options?.status
+  }
+
+  /** Type-narrowing check for EnrollError. */
+  static override isError(value: unknown): value is EnrollError {
+    return value instanceof EnrollError
   }
 }
