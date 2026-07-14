@@ -154,4 +154,13 @@ describe("connectCommand", () => {
     client.emit("message", "commands/reboot", Buffer.from("now"))
     expect(received).toEqual([{ topic: "commands/reboot", payload: Buffer.from("now") }])
   })
+
+  it("throws CredentialError if the device has no identity after connecting", async () => {
+    const fakeDevice = {
+      connect: async () => Promise.resolve(),
+      identity: null
+    } as unknown as Device
+
+    await expect(connectCommand({ device: fakeDevice })).rejects.toBeInstanceOf(CredentialError)
+  })
 })
