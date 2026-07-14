@@ -63,6 +63,16 @@ describe("enrollDeviceCertificate", () => {
     ).rejects.toBeInstanceOf(EnrollError)
   })
 
+  it("throws EnrollError with a generic message when the response body isn't JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("not json", { status: 500, headers: { "content-type": "text/plain" } })
+    )
+
+    await expect(
+      enrollDeviceCertificate("https://api.example.com", tokenCredential)
+    ).rejects.toThrow("Enrollment failed with status 500")
+  })
+
   it("throws EnrollError when the endpoint is unreachable", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNREFUSED"))
 
