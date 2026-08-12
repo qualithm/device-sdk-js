@@ -17,8 +17,15 @@ import {
   type MqttClient
 } from "mqtt"
 
+import {
+  buildManifest,
+  type CapabilityDeclaration,
+  decodeCommandPayload,
+  isValidCapabilityKey,
+  validateCommandValue
+} from "./capability.js"
 import { claimDevice } from "./claim.js"
-import { ConnectionError, CredentialError } from "./errors.js"
+import { CapabilityError, ConnectionError, CredentialError } from "./errors.js"
 import { createFileCredentialStore } from "./store.js"
 import type { ConnectionState, CredentialStore, DeviceCredential, DeviceOptions } from "./types.js"
 
@@ -27,6 +34,9 @@ const DEFAULT_RECONNECT_MS = 1000
 const DEFAULT_KEEPALIVE_S = 60
 const DEFAULT_STORE_PATH = ".qualithm/credential.json"
 const MQTT_PROTOCOL_VERSION = 5
+const COMMAND_TOPIC_PREFIX = "command/"
+const COMMAND_TOPIC_FILTER = "command/#"
+const MANIFEST_TOPIC = "capabilities"
 
 /** Listener notified on every connection-state transition. */
 export type StateListener = (state: ConnectionState) => void
@@ -34,9 +44,18 @@ export type StateListener = (state: ConnectionState) => void
 export type MessageListener = (topic: string, payload: Uint8Array) => void
 /** Listener notified for transport-level errors. */
 export type ErrorListener = (error: Error) => void
+/**
+ * Handler for commands addressed to one capability key. A settable
+ * capability's handler receives the decoded value; a `trigger` capability's
+ * handler is invoked with `undefined`.
+ */
+export type CommandHandler<V = unknown> = (value: V) => void
 
 const toMessage = (payload: string | Uint8Array): string | Buffer =>
   typeof payload === "string" ? payload : Buffer.from(payload)
+
+const asError = (value: unknown): Error =>
+  value instanceof Error ? value : new Error(String(value))
 
 /**
  * A connected Qualithm device.
@@ -58,6 +77,11 @@ export class Device {
   private readonly stateListeners = new Set<StateListener>()
   private readonly messageListeners = new Set<MessageListener>()
   private readonly errorListeners = new Set<ErrorListener>()
+  private readonly commandHandlers = new Map<string, CommandHandler>()
+  private declaredCapabilities = new Map<string, CapabilityDeclaration>()
+  private manifestJson: string | null = null
+  private commandSubscribed = false
+  private hasConnectedOnce = false
   private client: MqttClient | null = null
   private credential: DeviceCredential | null = null
   private state: ConnectionState = "idle"
@@ -65,6 +89,9 @@ export class Device {
   constructor(options: DeviceOptions) {
     this.options = options
     this.store = options.store ?? createFileCredentialStore(DEFAULT_STORE_PATH)
+    if (options.capabilities !== undefined) {
+      this.setCapabilities(options.capabilities)
+    }
   }
 
   /** The current connection state. */
@@ -93,6 +120,42 @@ export class Device {
   onError(listener: ErrorListener): () => void {
     this.errorListeners.add(listener)
     return () => this.errorListeners.delete(listener)
+  }
+
+  /**
+   * Register a handler for commands addressed to one capability key.
+   *
+   * The SDK subscribes `command/#` once and dispatches by key, decoding the
+   * Decision #241 payload first: a settable capability's handler receives the
+   * decoded value; a `trigger` capability's handler is invoked with no value.
+   * A malformed payload or a throwing handler is reported through `onError`
+   * without interrupting dispatch. Returns an unregister function.
+   */
+  onCommand<V>(key: string, handler: CommandHandler<V>): () => void {
+    if (!isValidCapabilityKey(key)) {
+      throw new CapabilityError(`Invalid capability key: ${key}`)
+    }
+    if (this.declaredCapabilities.get(key)?.type === "sensor") {
+      throw new CapabilityError(`Capability ${key} is read-only`)
+    }
+    this.commandHandlers.set(key, handler as CommandHandler)
+    void this.ensureCommandSubscription().catch((error: unknown) => {
+      this.emitError(asError(error))
+    })
+    return () => {
+      this.commandHandlers.delete(key)
+    }
+  }
+
+  /**
+   * Declare (or re-declare) the device's capability set. The manifest is
+   * validated locally, published on the current session, and re-published on
+   * every subsequent connect. Throws a `CapabilityError` on an invalid
+   * declaration.
+   */
+  async declareCapabilities(declarations: CapabilityDeclaration[]): Promise<void> {
+    this.setCapabilities(declarations)
+    await this.publishManifest()
   }
 
   /**
@@ -150,6 +213,8 @@ export class Device {
       })
     })
     this.client = null
+    this.commandSubscribed = false
+    this.hasConnectedOnce = false
   }
 
   /** Load the stored credential, or claim once and persist it. */
@@ -179,6 +244,8 @@ export class Device {
     this.client = client
     this.bindClientEvents(client)
     await this.waitForConnect(client)
+    await this.publishManifest()
+    await this.ensureCommandSubscription()
   }
 
   private buildClientOptions(credential: DeviceCredential): IClientOptions {
@@ -214,6 +281,13 @@ export class Device {
   private bindClientEvents(client: MqttClient): void {
     client.on("connect", () => {
       this.setState("connected")
+      if (this.hasConnectedOnce) {
+        // A reconnect re-declares the manifest; the platform upserts it.
+        void this.publishManifest().catch((error: unknown) => {
+          this.emitError(asError(error))
+        })
+      }
+      this.hasConnectedOnce = true
     })
     client.on("reconnect", () => {
       this.setState("reconnecting")
@@ -224,11 +298,60 @@ export class Device {
       }
     })
     client.on("message", (topic, payload) => {
+      if (topic.startsWith(COMMAND_TOPIC_PREFIX)) {
+        this.dispatchCommand(topic, payload)
+      }
       this.emitMessage(topic, payload)
     })
     client.on("error", (error) => {
       this.emitError(error)
     })
+  }
+
+  private setCapabilities(declarations: CapabilityDeclaration[]): void {
+    this.manifestJson = JSON.stringify(buildManifest(declarations))
+    this.declaredCapabilities = new Map(declarations.map((d) => [d.key, d]))
+  }
+
+  /** Publish the capability manifest, when one is declared and a session is live. */
+  private async publishManifest(): Promise<void> {
+    if (this.manifestJson === null || this.state !== "connected") {
+      return
+    }
+    await this.publish(MANIFEST_TOPIC, this.manifestJson)
+  }
+
+  /** Subscribe `command/#` once per session, when at least one handler is registered. */
+  private async ensureCommandSubscription(): Promise<void> {
+    if (this.commandSubscribed || this.commandHandlers.size === 0 || this.state !== "connected") {
+      return
+    }
+    await this.subscribe(COMMAND_TOPIC_FILTER)
+    this.commandSubscribed = true
+  }
+
+  /**
+   * Route one inbound `command/<key>` message to its registered handler. A
+   * malformed payload, a value that does not fit the declared capability, or
+   * a throwing handler surfaces through `onError` — never by escaping into
+   * the client's message loop.
+   */
+  private dispatchCommand(topic: string, payload: Uint8Array): void {
+    const key = topic.slice(COMMAND_TOPIC_PREFIX.length)
+    const handler = this.commandHandlers.get(key)
+    if (handler === undefined) {
+      return
+    }
+    try {
+      const decoded = decodeCommandPayload(payload)
+      const declared = this.declaredCapabilities.get(key)
+      if (declared !== undefined) {
+        validateCommandValue(declared, decoded)
+      }
+      handler(decoded.kind === "value" ? decoded.value : undefined)
+    } catch (error) {
+      this.emitError(asError(error))
+    }
   }
 
   private async waitForConnect(client: MqttClient): Promise<void> {

@@ -17,6 +17,8 @@ const CLAIM_ERROR_TAG = "ClaimError" as const
 const CREDENTIAL_ERROR_TAG = "CredentialError" as const
 const CONNECTION_ERROR_TAG = "ConnectionError" as const
 const ENROLL_ERROR_TAG = "EnrollError" as const
+const CAPABILITY_ERROR_TAG = "CapabilityError" as const
+const COMMAND_ERROR_TAG = "CommandError" as const
 
 /** Base error for all device SDK errors. */
 export class QualithmDeviceError extends Error {
@@ -103,5 +105,37 @@ export class EnrollError extends QualithmDeviceError {
   /** Type-narrowing check for EnrollError. */
   static override isError(value: unknown): value is EnrollError {
     return value instanceof EnrollError
+  }
+}
+
+/** An invalid capability key or declaration, rejected before it reaches the platform. */
+export class CapabilityError extends QualithmDeviceError {
+  /** Discriminant tag — always `"CapabilityError"`. */
+  override readonly tag = CAPABILITY_ERROR_TAG
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = "CapabilityError"
+  }
+
+  /** Type-narrowing check for CapabilityError. */
+  static override isError(value: unknown): value is CapabilityError {
+    return value instanceof CapabilityError
+  }
+}
+
+/** An inbound command that is malformed or does not fit the declared capability. */
+export class CommandError extends QualithmDeviceError {
+  /** Discriminant tag — always `"CommandError"`. */
+  override readonly tag = COMMAND_ERROR_TAG
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = "CommandError"
+  }
+
+  /** Type-narrowing check for CommandError. */
+  static override isError(value: unknown): value is CommandError {
+    return value instanceof CommandError
   }
 }
