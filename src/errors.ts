@@ -19,6 +19,7 @@ const CONNECTION_ERROR_TAG = "ConnectionError" as const
 const ENROLL_ERROR_TAG = "EnrollError" as const
 const CAPABILITY_ERROR_TAG = "CapabilityError" as const
 const COMMAND_ERROR_TAG = "CommandError" as const
+const PROVISIONING_ERROR_TAG = "ProvisioningError" as const
 
 /** Base error for all device SDK errors. */
 export class QualithmDeviceError extends Error {
@@ -121,6 +122,22 @@ export class CapabilityError extends QualithmDeviceError {
   /** Type-narrowing check for CapabilityError. */
   static override isError(value: unknown): value is CapabilityError {
     return value instanceof CapabilityError
+  }
+}
+
+/** Failure of the soft-AP provisioning server lifecycle (Decision #280). */
+export class ProvisioningError extends QualithmDeviceError {
+  /** Discriminant tag — always `"ProvisioningError"`. */
+  override readonly tag = PROVISIONING_ERROR_TAG
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = "ProvisioningError"
+  }
+
+  /** Type-narrowing check for ProvisioningError. */
+  static override isError(value: unknown): value is ProvisioningError {
+    return value instanceof ProvisioningError
   }
 }
 
