@@ -4,6 +4,8 @@
  * @packageDocumentation
  */
 
+import type { CapabilityDeclaration } from "./capability.js"
+
 /** Which credential mechanism a device authenticates with. */
 export type CredentialKind = "token" | "cert"
 
@@ -93,6 +95,12 @@ export type DeviceOptions = {
   name?: string
   /** Where the credential is persisted. Defaults to a crash-safe file store. */
   store?: CredentialStore
+  /**
+   * Capabilities the device declares to the platform, published as a manifest
+   * on every connect (Decision #241). Invalid declarations throw a
+   * `CapabilityError` from the constructor.
+   */
+  capabilities?: CapabilityDeclaration[]
   /** Reconnect backoff in milliseconds. Defaults to `1000`. */
   reconnectPeriodMs?: number
   /** Keep-alive interval in seconds. Defaults to `60`. */
