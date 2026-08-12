@@ -20,6 +20,10 @@ auto-reconnecting MQTT-over-TLS session — on Node, Bun, and Deno.
   constrained or hardened targets.
 - **Token and certificate paths** — bearer-token auth out of the box, plus on-device key + CSR
   generation for the mTLS certificate path.
+- **Command dispatch** — register a handler per capability key; the SDK subscribes `command/#`,
+  decodes the payload, and routes a typed value.
+- **Capability declaration** — the device publishes what it can do on connect, without hand-building
+  the manifest JSON.
 - **Runtime-agnostic** — runs on Node 20+, Bun, and Deno using only standard Web and Node APIs.
 
 ## Installation
@@ -76,6 +80,36 @@ const { privateKeyPem, csrPem } = await generateDeviceCsr(deviceId)
 // Submit csrPem to the operator mint flow, then persist the returned
 // certificate alongside privateKeyPem as a `cert` credential.
 ```
+
+### Commands & capabilities
+
+A device declares what it can do; the platform validates every command against that declaration
+before sending it. Declare capabilities once — the manifest is published on every connect — and
+register a handler per commandable key:
+
+```ts
+const device = new Device({
+  provisioningUrl: "https://api.qualithm.com",
+  broker: { host: "gw.de-fra-a.qualithm.com" },
+  claimCode: process.env.QUALITHM_CLAIM_CODE,
+  capabilities: [
+    { key: "power", type: "onoff" },
+    { key: "brightness", type: "range", min: 0, max: 100, unit: "percent" },
+    { key: "reboot", type: "trigger" }
+  ]
+})
+
+device.onCommand<boolean>("power", (value) => setRelay(value))
+device.onCommand<number>("brightness", (value) => setBrightness(value))
+device.onCommand("reboot", () => restart()) // a trigger arrives with no value
+
+await device.connect() // publishes the manifest and subscribes command/#
+```
+
+A command arrives on `command/<key>` with a JSON object payload — `{"value": ...}`, or `{}` for a
+trigger. A malformed payload or a value that does not fit the declared capability is reported
+through `onError` and never reaches the handler. To change the capability set at runtime, call
+`device.declareCapabilities([...])` again.
 
 ### Error Handling
 
