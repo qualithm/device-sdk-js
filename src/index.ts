@@ -29,11 +29,23 @@ export {
   ConnectionError,
   CredentialError,
   EnrollError,
+  ProvisioningError,
   QualithmDeviceError
 } from "./errors.js"
 
 // Stores
 export { createFileCredentialStore, createMemoryCredentialStore } from "./store.js"
+
+// Soft-AP provisioning server (Decision #280)
+export type {
+  AccessPointController,
+  ClaimExchange,
+  ProvisionedIdentity,
+  ProvisioningInfo,
+  ProvisioningServerOptions,
+  ProvisioningServerState
+} from "./provision-server.js"
+export { ProvisioningServer } from "./provision-server.js"
 
 // Types
 export type {
