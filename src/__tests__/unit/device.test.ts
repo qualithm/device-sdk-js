@@ -221,3 +221,57 @@ describe("Device errors", () => {
     expect(device.connectionState).toBe("closed")
   })
 })
+
+describe("Device soft-AP provisioning", () => {
+  it("serves the claim exchange while idle, then connects with the claimed credential", async () => {
+    // An earlier test installs a fetch spy with clearAllMocks (not restore);
+    // drop it so the claim request reaches the real provisioning server.
+    vi.restoreAllMocks()
+    const device = newDevice(createMemoryCredentialStore())
+    const states: string[] = []
+    device.onState((state) => states.push(state))
+
+    let onProvisioned!: (credential: DeviceCredential) => void
+    const provisioned = new Promise<DeviceCredential>((resolve) => {
+      onProvisioned = resolve
+    })
+    const server = await device.startProvisioning({
+      host: "127.0.0.1",
+      port: 0,
+      exchange: async () => Promise.resolve(tokenCredential),
+      onProvisioned
+    })
+    expect(device.connectionState).toBe("provisioning")
+
+    const address = server.boundAddress
+    expect(address).not.toBeNull()
+    if (address === null) {
+      return
+    }
+    const response = await fetch(`http://127.0.0.1:${String(address.port)}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y" })
+    })
+    expect(response.status).toBe(200)
+
+    await provisioned
+    expect(server.state).toBe("provisioned")
+
+    await connectWith(device, new FakeMqttClient())
+    expect(device.connectionState).toBe("connected")
+    expect(device.identity?.deviceId).toBe(tokenCredential.deviceId)
+    expect(states).toEqual(["provisioning", "connecting", "connected"])
+  })
+
+  it("refuses to start provisioning while a gateway session is active", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    await connectWith(device, new FakeMqttClient())
+    await expect(device.startProvisioning()).rejects.toBeInstanceOf(ConnectionError)
+  })
+
+  it("reverts to idle when the server fails to start", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    await expect(device.startProvisioning()).rejects.toThrow()
+    expect(device.connectionState).toBe("idle")
+  })
+})

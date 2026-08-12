@@ -22,6 +22,8 @@ auto-reconnecting MQTT-over-TLS session — on Node, Bun, and Deno.
   generation for the mTLS certificate path.
 - **Command dispatch** — register a handler per capability key; the SDK subscribes `command/#`,
   decodes the payload, and routes a typed value.
+- **Soft-AP onboarding** — serve the claim exchange on the device's own setup network, so the
+  companion app provisions a device with no terminal in the loop.
 - **Capability declaration** — the device publishes what it can do on connect, without hand-building
   the manifest JSON.
 - **Runtime-agnostic** — runs on Node 20+, Bun, and Deno using only standard Web and Node APIs.
@@ -111,6 +113,31 @@ trigger. A malformed payload or a value that does not fit the declared capabilit
 through `onError` and never reaches the handler. To change the capability set at runtime, call
 `device.declareCapabilities([...])` again.
 
+### Soft-AP provisioning
+
+For onboarding without a terminal — the companion-app flow (Decision #280) — the device serves the
+claim exchange itself. While no credential is stored, `startProvisioning()` brings up the setup
+access point (via a deployment-supplied controller) and serves the exchange on it. A successful
+claim persists the credential, drops the AP, and hands off to `connect()`:
+
+```ts
+const device = new Device({
+  provisioningUrl: "https://api.qualithm.com",
+  broker: { host: "gw.de-fra-a.qualithm.com" },
+  name: "field-gateway"
+})
+
+await device.startProvisioning({
+  accessPoint: nmcliSoftAp(), // deployment-supplied AP bring-up/teardown
+  onProvisioned: () => device.connect()
+})
+```
+
+The companion app joins the setup network, reads `GET /provision/info`, and posts the claim code to
+`POST /provision/claim`. The server never runs alongside a gateway session: it refuses to start once
+a credential exists, and a successful claim stops it before the MQTT session opens. A failed claim
+(bad code, unreachable platform) leaves the server running, so onboarding can be retried.
+
 ### Error Handling
 
 All errors extend `QualithmDeviceError`; each subclass exposes a static `isError()` for
@@ -150,6 +177,7 @@ See the [`examples/`](examples/) directory for runnable examples:
 | [`basic-usage.ts`](examples/basic-usage.ts)                       | Configure a device, generate a CSR, claim + connect    |
 | [`error-handling.ts`](examples/error-handling.ts)                 | Typed error hierarchy and `isError()` narrowing        |
 | [`credential-persistence.ts`](examples/credential-persistence.ts) | Crash-safe file store; reuse the credential on restart |
+| [`softap-provisioning.ts`](examples/softap-provisioning.ts)       | Serve the claim exchange on the device's setup network |
 
 ```bash
 bun run examples/basic-usage.ts

@@ -26,6 +26,7 @@ import {
 } from "./capability.js"
 import { claimDevice } from "./claim.js"
 import { CapabilityError, ConnectionError, CredentialError } from "./errors.js"
+import { ProvisioningServer, type ProvisioningServerOptions } from "./provision-server.js"
 import { createFileCredentialStore } from "./store.js"
 import type { ConnectionState, CredentialStore, DeviceCredential, DeviceOptions } from "./types.js"
 
@@ -156,6 +157,47 @@ export class Device {
   async declareCapabilities(declarations: CapabilityDeclaration[]): Promise<void> {
     this.setCapabilities(declarations)
     await this.publishManifest()
+  }
+
+  /**
+   * Start soft-AP provisioning mode (Decision #280): serve the claim exchange
+   * on the device's setup network until the companion app claims the device.
+   *
+   * Only available before a gateway session exists — never alongside one. A
+   * successful claim persists the credential, stops the server and the setup
+   * access point, and invokes `onProvisioned`; `connect()` then proceeds with
+   * the stored credential. While the server is serving, the device's state is
+   * `provisioning`.
+   *
+   * @throws {@link ConnectionError} when a gateway session is active or the
+   * device is closed.
+   * @throws {@link ProvisioningError} when the device is already provisioned
+   * or the server fails to start.
+   */
+  async startProvisioning(
+    options?: Omit<ProvisioningServerOptions, "provisioningUrl" | "store">
+  ): Promise<ProvisioningServer> {
+    if (this.state !== "idle" && this.state !== "provisioning") {
+      throw new ConnectionError("Cannot start provisioning while a gateway session is active")
+    }
+    const server = new ProvisioningServer({
+      ...options,
+      provisioningUrl: this.options.provisioningUrl,
+      store: this.store,
+      deviceName: options?.deviceName ?? this.options.name,
+      onProvisioned: async (credential) => {
+        this.credential = credential
+        await options?.onProvisioned?.(credential)
+      }
+    })
+    this.setState("provisioning")
+    try {
+      await server.start()
+    } catch (error) {
+      this.setState("idle")
+      throw error
+    }
+    return server
   }
 
   /**
