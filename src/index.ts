@@ -18,12 +18,14 @@ export type { EnrollRequest } from "./enroll.js"
 export { enrollDeviceCertificate } from "./enroll.js"
 
 // Device
-export type { ErrorListener, MessageListener, StateListener } from "./device.js"
+export type { CommandHandler, ErrorListener, MessageListener, StateListener } from "./device.js"
 export { Device } from "./device.js"
 
 // Errors
 export {
+  CapabilityError,
   ClaimError,
+  CommandError,
   ConnectionError,
   CredentialError,
   EnrollError,
@@ -42,3 +44,19 @@ export type {
   DeviceCredential,
   DeviceOptions
 } from "./types.js"
+
+// Capabilities & commands (Decision #241)
+export type {
+  CapabilityDeclaration,
+  CapabilityManifest,
+  CapabilityType,
+  CommandPayload,
+  EnumDeclaration,
+  JsonValue,
+  ManifestCapability,
+  OnOffDeclaration,
+  RangeDeclaration,
+  SensorDeclaration,
+  TriggerDeclaration
+} from "./capability.js"
+export { isValidCapabilityKey } from "./capability.js"
