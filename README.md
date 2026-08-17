@@ -1,10 +1,8 @@
 # Device SDK
 
-<!-- TODO: uncomment badges after first publish
 [![CI](https://github.com/qualithm/device-sdk-js/actions/workflows/ci.yaml/badge.svg)](https://github.com/qualithm/device-sdk-js/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/qualithm/device-sdk-js/graph/badge.svg)](https://codecov.io/gh/qualithm/device-sdk-js)
 [![npm](https://img.shields.io/npm/v/@qualithm/device)](https://www.npmjs.com/package/@qualithm/device)
--->
 
 Device provisioning and connectivity SDK for JavaScript and TypeScript runtimes. It hides the device
 lifecycle behind a single `connect()` call — claim once, persist the credential, and maintain an
@@ -115,10 +113,10 @@ through `onError` and never reaches the handler. To change the capability set at
 
 ### Soft-AP provisioning
 
-For onboarding without a terminal — the companion-app flow (Decision #280) — the device serves the
-claim exchange itself. While no credential is stored, `startProvisioning()` brings up the setup
-access point (via a deployment-supplied controller) and serves the exchange on it. A successful
-claim persists the credential, drops the AP, and hands off to `connect()`:
+For onboarding without a terminal — the companion-app flow — the device serves the claim exchange
+itself. While no credential is stored, `startProvisioning()` brings up the setup access point (via a
+deployment-supplied controller) and serves the exchange on it. A successful claim persists the
+credential, drops the AP, and hands off to `connect()`:
 
 ```ts
 const device = new Device({
