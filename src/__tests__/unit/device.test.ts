@@ -4,7 +4,7 @@ import { connect, type MqttClient } from "mqtt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { Device } from "../../device.js"
-import { ConnectionError, CredentialError } from "../../errors.js"
+import { ConnectionError, CredentialError, PayloadTooLargeError } from "../../errors.js"
 import { createMemoryCredentialStore } from "../../store.js"
 import type { CredentialStore, DeviceCredential } from "../../types.js"
 
@@ -54,7 +54,19 @@ const connectWith = async (device: Device, client: FakeMqttClient): Promise<void
   vi.mocked(connect).mockReturnValue(client as unknown as MqttClient)
   const pending = device.connect()
   await new Promise((resolve) => setTimeout(resolve, 0))
-  client.emit("connect")
+  client.emit("connect", { properties: {} })
+  await pending
+}
+
+const connectWithLimit = async (
+  device: Device,
+  client: FakeMqttClient,
+  maximumPacketSize: number
+): Promise<void> => {
+  vi.mocked(connect).mockReturnValue(client as unknown as MqttClient)
+  const pending = device.connect()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  client.emit("connect", { properties: { maximumPacketSize } })
   await pending
 }
 
@@ -97,6 +109,37 @@ describe("Device connect (token)", () => {
     await device.subscribe("commands")
     expect(client.publishCalls).toHaveLength(1)
     expect(client.subscribeCalls).toHaveLength(1)
+  })
+
+  it("rejects an oversize publish before it reaches the wire (platform#559)", async () => {
+    const limited = newDevice(await seededStore(tokenCredential))
+    const limitedClient = new FakeMqttClient()
+    await connectWithLimit(limited, limitedClient, 8)
+
+    await expect(limited.publish("telemetry", "012345678")).rejects.toBeInstanceOf(
+      PayloadTooLargeError
+    )
+    // Nothing was sent — the guard fired before the bytes went out.
+    expect(limitedClient.publishCalls).toHaveLength(0)
+  })
+
+  it("publishes a payload at the ceiling and one under it", async () => {
+    const limited = newDevice(await seededStore(tokenCredential))
+    const limitedClient = new FakeMqttClient()
+    await connectWithLimit(limited, limitedClient, 8)
+
+    await limited.publish("telemetry", "12345678")
+    expect(limitedClient.publishCalls).toHaveLength(1)
+  })
+
+  it("leaves the publish guard inert when the gateway advertises no ceiling", async () => {
+    // A CONNACK with no maximumPacketSize property: the guard must not fire.
+    const device = newDevice(await seededStore(tokenCredential))
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+
+    await device.publish("telemetry", new Uint8Array(1024 * 1024))
+    expect(client.publishCalls).toHaveLength(1)
   })
 
   it("disconnects gracefully", async () => {
