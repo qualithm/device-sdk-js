@@ -48,6 +48,10 @@ export type {
 } from "./provision-server.js"
 export { ProvisioningServer } from "./provision-server.js"
 
+// Reference setup access point for the Pi/Node path (platform#169)
+export type { HotspotCommands, NmcliAccessPointOptions } from "./access-point.js"
+export { createNmcliAccessPoint, hotspotCommands } from "./access-point.js"
+
 // Types
 export type {
   BrokerOptions,
