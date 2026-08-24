@@ -132,6 +132,16 @@ describe("Device connect (token)", () => {
     expect(limitedClient.publishCalls).toHaveLength(1)
   })
 
+  it("leaves the publish guard inert when the gateway advertises no ceiling", async () => {
+    // A CONNACK with no maximumPacketSize property: the guard must not fire.
+    const device = newDevice(await seededStore(tokenCredential))
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+
+    await device.publish("telemetry", new Uint8Array(1024 * 1024))
+    expect(client.publishCalls).toHaveLength(1)
+  })
+
   it("disconnects gracefully", async () => {
     await device.disconnect()
     expect(device.connectionState).toBe("closed")
