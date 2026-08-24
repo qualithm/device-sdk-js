@@ -20,6 +20,7 @@ const ENROLL_ERROR_TAG = "EnrollError" as const
 const CAPABILITY_ERROR_TAG = "CapabilityError" as const
 const COMMAND_ERROR_TAG = "CommandError" as const
 const PROVISIONING_ERROR_TAG = "ProvisioningError" as const
+const PAYLOAD_TOO_LARGE_ERROR_TAG = "PayloadTooLargeError" as const
 
 /** Base error for all device SDK errors. */
 export class QualithmDeviceError extends Error {
@@ -138,6 +139,30 @@ export class ProvisioningError extends QualithmDeviceError {
   /** Type-narrowing check for ProvisioningError. */
   static override isError(value: unknown): value is ProvisioningError {
     return value instanceof ProvisioningError
+  }
+}
+
+/** A publish that exceeds the gateway's advertised event payload ceiling. */
+export class PayloadTooLargeError extends QualithmDeviceError {
+  /** Discriminant tag — always `"PayloadTooLargeError"`. */
+  override readonly tag = PAYLOAD_TOO_LARGE_ERROR_TAG
+
+  /** The ceiling the gateway advertised in CONNACK, in bytes. */
+  readonly maxBytes: number
+
+  /** The payload size that was refused, in bytes. */
+  readonly actualBytes: number
+
+  constructor(message: string, options?: ErrorOptions & { maxBytes: number; actualBytes: number }) {
+    super(message, options)
+    this.name = "PayloadTooLargeError"
+    this.maxBytes = options?.maxBytes ?? 0
+    this.actualBytes = options?.actualBytes ?? 0
+  }
+
+  /** Type-narrowing check for PayloadTooLargeError. */
+  static override isError(value: unknown): value is PayloadTooLargeError {
+    return value instanceof PayloadTooLargeError
   }
 }
 
