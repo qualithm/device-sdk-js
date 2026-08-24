@@ -25,7 +25,12 @@ import {
   validateCommandValue
 } from "./capability.js"
 import { claimDevice } from "./claim.js"
-import { CapabilityError, ConnectionError, CredentialError } from "./errors.js"
+import {
+  CapabilityError,
+  ConnectionError,
+  CredentialError,
+  PayloadTooLargeError
+} from "./errors.js"
 import { ProvisioningServer, type ProvisioningServerOptions } from "./provision-server.js"
 import { createFileCredentialStore } from "./store.js"
 import type { ConnectionState, CredentialStore, DeviceCredential, DeviceOptions } from "./types.js"
@@ -86,6 +91,13 @@ export class Device {
   private client: MqttClient | null = null
   private credential: DeviceCredential | null = null
   private state: ConnectionState = "idle"
+  /**
+   * The event payload ceiling the gateway advertised in CONNACK
+   * (`maximumPacketSize`, platform#559). `null` until the first successful
+   * connect; the publish guard only fires once the gateway has told us the
+   * limit, so an unadvertised connection is never blocked client-side.
+   */
+  private maxEventBytes: number | null = null
 
   constructor(options: DeviceOptions) {
     this.options = options
@@ -210,15 +222,29 @@ export class Device {
     await this.openConnection(credential)
   }
 
-  /** Publish a payload to a (device-relative) topic. */
+  /**
+   * Publish a payload to a (device-relative) topic.
+   *
+   * @throws {@link PayloadTooLargeError} when the payload exceeds the ceiling
+   * the gateway advertised in CONNACK (platform#559) — caught before the bytes
+   * go on the wire, so the device is told rather than silently dropped.
+   */
   async publish(
     topic: string,
     payload: string | Uint8Array,
     options?: IClientPublishOptions
   ): Promise<void> {
     const client = this.requireClient()
+    const message = toMessage(payload)
+    const max = this.maxEventBytes
+    if (max !== null && message.length > max) {
+      throw new PayloadTooLargeError(
+        `Event payload of ${String(message.length)} bytes exceeds the gateway's ${String(max)}-byte limit`,
+        { maxBytes: max, actualBytes: message.length }
+      )
+    }
     await new Promise<void>((resolve, reject) => {
-      client.publish(topic, toMessage(payload), options ?? {}, (error) => {
+      client.publish(topic, message, options ?? {}, (error) => {
         if (error) {
           reject(error)
           return
@@ -398,8 +424,12 @@ export class Device {
 
   private async waitForConnect(client: MqttClient): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      const onConnect = (): void => {
+      const onConnect = (connack?: { properties?: { maximumPacketSize?: number } }): void => {
         client.removeListener("error", onError)
+        // Capture the gateway's advertised event ceiling (platform#559) for the
+        // publish guard. An absent property leaves the guard inert.
+        const advertised = connack?.properties?.maximumPacketSize
+        this.maxEventBytes = typeof advertised === "number" ? advertised : null
         resolve()
       }
       const onError = (error: Error): void => {

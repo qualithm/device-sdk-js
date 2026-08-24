@@ -29,6 +29,7 @@ export {
   ConnectionError,
   CredentialError,
   EnrollError,
+  PayloadTooLargeError,
   ProvisioningError,
   QualithmDeviceError
 } from "./errors.js"
