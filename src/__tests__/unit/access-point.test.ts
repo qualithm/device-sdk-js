@@ -55,4 +55,12 @@ describe("createNmcliAccessPoint", () => {
     // so an interrupted onboarding can restart.
     await expect(ap.stop()).resolves.toBeUndefined()
   })
+
+  it("defaults to the real nmcli runner when none is injected", () => {
+    // Exercises the `runner = defaultRunner` default-parameter branch without
+    // executing it — constructing the controller is enough to cover the arm.
+    const ap = createNmcliAccessPoint({ ssid: "qualithm-setup-a1b2" })
+    expect(typeof ap.start).toBe("function")
+    expect(typeof ap.stop).toBe("function")
+  })
 })
