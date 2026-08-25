@@ -51,7 +51,10 @@ export const hotspotCommands = (options: NmcliAccessPointOptions): HotspotComman
   }
 }
 
-const run = async (args: readonly string[]): Promise<void> => {
+/** Runs one `nmcli` invocation. The default shells out; injectable in tests. */
+export type NmcliRunner = (args: readonly string[]) => Promise<void>
+
+const defaultRunner: NmcliRunner = async (args) => {
   await execFileAsync("nmcli", [...args])
 }
 
@@ -64,15 +67,18 @@ const run = async (args: readonly string[]): Promise<void> => {
  * profile is already gone) tears down cleanly, which keeps a failed or
  * interrupted onboarding restartable.
  */
-export const createNmcliAccessPoint = (options: NmcliAccessPointOptions): AccessPointController => {
+export const createNmcliAccessPoint = (
+  options: NmcliAccessPointOptions,
+  runner: NmcliRunner = defaultRunner
+): AccessPointController => {
   const { up, down } = hotspotCommands(options)
   return {
     start: async () => {
-      await run(up)
+      await runner(up)
     },
     stop: async () => {
       try {
-        await run(down)
+        await runner(down)
       } catch {
         // The hotspot profile may not exist (never started, or already
         // removed) — teardown is best-effort so onboarding can restart.
