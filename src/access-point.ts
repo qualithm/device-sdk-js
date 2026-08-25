@@ -54,6 +54,7 @@ export const hotspotCommands = (options: NmcliAccessPointOptions): HotspotComman
 /** Runs one `nmcli` invocation. The default shells out; injectable in tests. */
 export type NmcliRunner = (args: readonly string[]) => Promise<void>
 
+/* istanbul ignore next -- the boundary that actually runs nmcli; exercised on the device, covered only via the injected runner in tests */
 const defaultRunner: NmcliRunner = async (args) => {
   await execFileAsync("nmcli", [...args])
 }
