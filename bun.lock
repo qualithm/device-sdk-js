@@ -28,9 +28,6 @@
     },
   },
   "overrides": {
-    "// @babel/core": "security: browserslist ≤4.28.6; lift until sub-deps resolve a safe browserslist (GHSA-c83g-rgw3-j3cx, GHSA-73wf-gq98-2v4g)",
-    "// baseline-browser-mapping": "security: >=2.0.0 <2.11.0; pinned to 2.11.25 (GHSA-w5vr-8v7q-w6rv)",
-    "// browserslist": "security: browserslist ≤4.28.6; pinned to patched 4.29.0",
     "@babel/core": "7.29.6",
     "baseline-browser-mapping": "2.11.25",
     "browserslist": "4.29.0",
