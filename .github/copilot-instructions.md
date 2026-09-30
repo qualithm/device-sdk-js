@@ -43,5 +43,5 @@ auto-reconnecting MQTT-over-TLS session to the Qualithm gateway.
 
 ## Validate
 
-See [.github/instructions/checks.instructions.md](.github/instructions/checks.instructions.md)
+See `.github/instructions/checks.instructions.md`
 (synced from dx) for the exact commands this repo's CI enforces.
