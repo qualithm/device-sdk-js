@@ -1,4 +1,4 @@
-# Copilot instructions — @qualithm/device
+# Code conventions — @qualithm/device
 
 The Qualithm device SDK for JavaScript/TypeScript runtimes (Node, Bun, Deno). It hides the device
 lifecycle behind one `connect()` call: claim once, persist the credential, and maintain an
@@ -43,5 +43,4 @@ auto-reconnecting MQTT-over-TLS session to the Qualithm gateway.
 
 ## Validate
 
-See `.github/instructions/checks.instructions.md` (synced from dx) for the exact commands this
-repo's CI enforces.
+See `.claude/rules/checks.md` (synced from dx) for the exact commands this repo's CI enforces.
