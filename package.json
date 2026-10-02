@@ -1,6 +1,6 @@
 {
   "name": "@qualithm/device",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Device provisioning and connectivity SDK for JavaScript and TypeScript runtimes.",
   "private": false,
   "type": "module",
@@ -105,10 +105,12 @@
     "linkify-it": "5.0.2",
     "ip-address": "10.7.2",
     "@humanfs/node": "0.17.0",
-    "// @humanfs/node": "security: <0.16.8; pinned to 0.17.0 (GHSA-p498-v437-472g)",
     "browserslist": "4.29.0",
-    "// browserslist": "security: browserslist ≤4.28.6; pinned to patched 4.29.0",
-    "baseline-browser-mapping": "2.11.25",
-    "// baseline-browser-mapping": "security: >=2.0.0 <2.11.0; pinned to 2.11.25 (GHSA-w5vr-8v7q-w6rv)"
+    "baseline-browser-mapping": "2.11.25"
+  },
+  "//overrides": {
+    "@humanfs/node": "security: <0.16.8; pinned to 0.17.0 (GHSA-p498-v437-472g)",
+    "browserslist": "security: browserslist ≤4.28.6; pinned to patched 4.29.0",
+    "baseline-browser-mapping": "security: >=2.0.0 <2.11.0; pinned to 2.11.25 (GHSA-w5vr-8v7q-w6rv)"
   }
 }
