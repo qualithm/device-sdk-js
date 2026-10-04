@@ -8,6 +8,7 @@
  * auth rather than a CONNECT packet's username/password fields.
  */
 
+import { parseBroker } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { EnrollError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
@@ -23,6 +24,7 @@ export type EnrollRequest = {
 type EnrollData = {
   certificatePem: string
   caCertificatePem: string
+  broker?: unknown
 }
 
 type EnrollEnvelope = {
@@ -84,6 +86,8 @@ export const enrollDeviceCertificate = async (
     throw new EnrollError(message, { status: response.status })
   }
 
+  // The platform names the broker again at enrollment; keep the claimed one if it doesn't.
+  const broker = parseBroker(data.broker) ?? credential.broker
   return {
     deviceId: credential.deviceId,
     teamId: credential.teamId,
@@ -92,6 +96,7 @@ export const enrollDeviceCertificate = async (
     privateKeyPem: keyMaterial.privateKeyPem,
     certificatePem: data.certificatePem,
     caCertificatePem: data.caCertificatePem,
-    issuedAt: new Date().toISOString()
+    issuedAt: new Date().toISOString(),
+    ...(broker !== undefined && { broker })
   }
 }

@@ -33,7 +33,14 @@ import {
 } from "./errors.js"
 import { ProvisioningServer, type ProvisioningServerOptions } from "./provision-server.js"
 import { createFileCredentialStore } from "./store.js"
-import type { ConnectionState, CredentialStore, DeviceCredential, DeviceOptions } from "./types.js"
+import type {
+  BrokerEndpoint,
+  BrokerOptions,
+  ConnectionState,
+  CredentialStore,
+  DeviceCredential,
+  DeviceOptions
+} from "./types.js"
 
 const DEFAULT_PORT = 8883
 const DEFAULT_RECONNECT_MS = 1000
@@ -64,13 +71,36 @@ const asError = (value: unknown): Error =>
   value instanceof Error ? value : new Error(String(value))
 
 /**
+ * Choose the gateway to connect to. A configured host wins; otherwise the device uses the broker
+ * the platform returned at enrollment, so it needs no hardcoded host. A configured port overrides
+ * either source's port.
+ *
+ * @param configured - The `broker` passed to the {@link Device}
+ * @param credential - The stored credential, carrying the enrolled broker
+ * @throws {@link ConnectionError} when neither names a host
+ */
+export const resolveBroker = (
+  configured: BrokerOptions | undefined,
+  credential: DeviceCredential
+): BrokerEndpoint => {
+  if (configured?.host !== undefined && configured.host !== "") {
+    return { host: configured.host, port: configured.port ?? DEFAULT_PORT }
+  }
+  if (credential.broker !== undefined) {
+    return { host: credential.broker.host, port: configured?.port ?? credential.broker.port }
+  }
+  throw new ConnectionError(
+    "No broker host is configured and the stored credential has none from enrollment"
+  )
+}
+
+/**
  * A connected Qualithm device.
  *
  * @example
  * ```ts
  * const device = new Device({
  *   provisioningUrl: "https://api.qualithm.com",
- *   broker: { host: "gw.de-fra-a.qualithm.com" },
  *   claimCode: process.env.QUALITHM_CLAIM_CODE
  * })
  * await device.connect()
@@ -318,17 +348,18 @@ export class Device {
 
   private buildClientOptions(credential: DeviceCredential): IClientOptions {
     const { broker } = this.options
+    const endpoint = resolveBroker(broker, credential)
     const base: IClientOptions = {
-      host: broker.host,
-      port: broker.port ?? DEFAULT_PORT,
+      host: endpoint.host,
+      port: endpoint.port,
       protocol: "mqtts",
       protocolVersion: MQTT_PROTOCOL_VERSION,
       clientId: credential.deviceId,
       clean: true,
       keepalive: this.options.keepaliveSeconds ?? DEFAULT_KEEPALIVE_S,
       reconnectPeriod: this.options.reconnectPeriodMs ?? DEFAULT_RECONNECT_MS,
-      ...(broker.ca !== undefined && { ca: broker.ca }),
-      ...(broker.rejectUnauthorized !== undefined && {
+      ...(broker?.ca !== undefined && { ca: broker.ca }),
+      ...(broker?.rejectUnauthorized !== undefined && {
         rejectUnauthorized: broker.rejectUnauthorized
       })
     }
