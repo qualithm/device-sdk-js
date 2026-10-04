@@ -48,6 +48,38 @@ describe("enrollDeviceCertificate", () => {
     expect(body.csrPem).toContain("BEGIN CERTIFICATE REQUEST")
   })
 
+  it("takes the broker from the enrollment response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        data: {
+          certificatePem: "cert-pem",
+          caCertificatePem: "ca-pem",
+          broker: { host: "gw.sg-sin-a.qualithm.com", port: 8883 }
+        }
+      })
+    )
+
+    const credential = await enrollDeviceCertificate("https://api.example.com", {
+      ...tokenCredential,
+      broker: { host: "gw.old.qualithm.com", port: 8883 }
+    })
+
+    expect(credential.broker).toEqual({ host: "gw.sg-sin-a.qualithm.com", port: 8883 })
+  })
+
+  it("keeps the claimed broker when the enrollment response has none", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+    )
+
+    const credential = await enrollDeviceCertificate("https://api.example.com", {
+      ...tokenCredential,
+      broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 }
+    })
+
+    expect(credential.broker).toEqual({ host: "gw.test-sg-sin-a.qualithm.com", port: 8883 })
+  })
+
   it("throws EnrollError when the credential has no token", async () => {
     const certCredential: DeviceCredential = { ...tokenCredential, kind: "cert", token: undefined }
     await expect(

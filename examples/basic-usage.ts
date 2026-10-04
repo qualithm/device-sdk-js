@@ -18,11 +18,12 @@ async function main(): Promise<void> {
   console.log("=== Basic Usage ===\n")
 
   const claimCode = process.env.QUALITHM_CLAIM_CODE
-  const host = process.env.QUALITHM_GATEWAY ?? "gw.example.qualithm.com"
+  // The gateway comes from the claim response; QUALITHM_GATEWAY overrides it, e.g. for a local broker.
+  const gateway = process.env.QUALITHM_GATEWAY
 
   const device = new Device({
     provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com",
-    broker: { host },
+    ...(gateway !== undefined && { broker: { host: gateway } }),
     ...(claimCode !== undefined && { claimCode })
   })
 
@@ -37,7 +38,9 @@ async function main(): Promise<void> {
   console.log(`  csr:         ${csrPem.split("\n")[0] ?? ""}`)
 
   if (claimCode === undefined) {
-    console.log("\nSet QUALITHM_CLAIM_CODE (and QUALITHM_GATEWAY) to claim and connect.")
+    console.log(
+      "\nSet QUALITHM_CLAIM_CODE (and QUALITHM_API for a non-production claim code) to claim and connect."
+    )
     return
   }
 
