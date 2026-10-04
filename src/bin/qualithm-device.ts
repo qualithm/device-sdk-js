@@ -20,7 +20,6 @@ import { QualithmDeviceError } from "../errors.js"
 import { createFileCredentialStore } from "../store.js"
 
 const DEFAULT_STORE_PATH = ".qualithm/credential.json"
-const DEFAULT_BROKER_PORT = 8883
 
 function requireValue(value: string | undefined, flag: string): string {
   if (value === undefined || value === "") {
@@ -129,15 +128,16 @@ async function runConnect(argv: string[]): Promise<void> {
     values["provisioning-url"] ?? process.env.QUALITHM_PROVISIONING_URL,
     "--provisioning-url"
   )
-  const host = requireValue(values.host ?? process.env.QUALITHM_BROKER_HOST, "--host")
+  // Optional: unset, the device connects to the broker the platform returned at claim time.
+  const host = values.host ?? process.env.QUALITHM_BROKER_HOST
   const store = createFileCredentialStore(values.store ?? DEFAULT_STORE_PATH)
   const ca = await readCa(values.ca)
 
   const device = new Device({
     provisioningUrl,
     broker: {
-      host,
-      port: values.port !== undefined ? Number(values.port) : DEFAULT_BROKER_PORT,
+      ...(host !== undefined && host !== "" && { host }),
+      ...(values.port !== undefined && { port: Number(values.port) }),
       ...(ca !== undefined && { ca }),
       ...(values.insecure === true && { rejectUnauthorized: false })
     },

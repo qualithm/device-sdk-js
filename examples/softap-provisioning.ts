@@ -22,8 +22,7 @@ async function main(): Promise<void> {
   console.log("=== Soft-AP Provisioning ===\n")
 
   const device = new Device({
-    provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com",
-    broker: { host: process.env.QUALITHM_GATEWAY ?? "gw.example.qualithm.com" }
+    provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com"
   })
 
   device.onState((state) => {

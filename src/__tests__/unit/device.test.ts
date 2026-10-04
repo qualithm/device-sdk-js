@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events"
 import { connect, type MqttClient } from "mqtt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { Device } from "../../device.js"
+import { Device, resolveBroker } from "../../device.js"
 import { ConnectionError, CredentialError, PayloadTooLargeError } from "../../errors.js"
 import { createMemoryCredentialStore } from "../../store.js"
 import type { CredentialStore, DeviceCredential } from "../../types.js"
@@ -316,5 +316,91 @@ describe("Device soft-AP provisioning", () => {
     const device = newDevice(await seededStore(tokenCredential))
     await expect(device.startProvisioning()).rejects.toThrow()
     expect(device.connectionState).toBe("idle")
+  })
+})
+
+describe("resolveBroker", () => {
+  const claimed: DeviceCredential = {
+    ...tokenCredential,
+    broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 }
+  }
+
+  it("uses the claimed broker when no host is configured", () => {
+    expect(resolveBroker(undefined, claimed)).toEqual({
+      host: "gw.test-sg-sin-a.qualithm.com",
+      port: 8883
+    })
+    expect(resolveBroker({ ca: "CA" }, claimed)).toEqual({
+      host: "gw.test-sg-sin-a.qualithm.com",
+      port: 8883
+    })
+  })
+
+  it("prefers a configured host over the claimed broker", () => {
+    expect(resolveBroker({ host: "gw.override.example.com" }, claimed)).toEqual({
+      host: "gw.override.example.com",
+      port: 8883
+    })
+  })
+
+  it("applies a configured port to either source", () => {
+    expect(resolveBroker({ port: 9000 }, claimed).port).toBe(9000)
+    expect(resolveBroker({ host: "gw.override.example.com", port: 9001 }, claimed).port).toBe(9001)
+  })
+
+  it("treats an empty configured host as unset", () => {
+    expect(resolveBroker({ host: "" }, claimed).host).toBe("gw.test-sg-sin-a.qualithm.com")
+  })
+
+  it("throws ConnectionError when neither names a host", () => {
+    expect(() => resolveBroker(undefined, tokenCredential)).toThrow(ConnectionError)
+  })
+})
+
+describe("Device with a claimed broker", () => {
+  it("claims with no broker configured and connects to the claimed gateway", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            deviceId: "d",
+            spaceId: "s",
+            teamId: "t",
+            secret: "qmd_n",
+            broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 }
+          }
+        }),
+        { status: 201, headers: { "content-type": "application/json" } }
+      )
+    )
+    const store = createMemoryCredentialStore()
+    const device = new Device({
+      provisioningUrl: "https://api.test.qualithm.com",
+      claimCode: "qmc_x.y",
+      store
+    })
+
+    await connectWith(device, new FakeMqttClient())
+
+    expect(vi.mocked(connect).mock.calls[0]?.[0]).toMatchObject({
+      host: "gw.test-sg-sin-a.qualithm.com",
+      port: 8883
+    })
+    // Persisted with the credential, so a restart reconnects to the same gateway.
+    expect((await store.load())?.broker).toEqual({
+      host: "gw.test-sg-sin-a.qualithm.com",
+      port: 8883
+    })
+  })
+
+  it("fails to connect when a stored credential predates the broker and none is configured", async () => {
+    const device = new Device({
+      provisioningUrl: "https://api.example.com",
+      store: await seededStore(tokenCredential)
+    })
+    vi.mocked(connect).mockReturnValue(new FakeMqttClient() as unknown as MqttClient)
+
+    await expect(device.connect()).rejects.toBeInstanceOf(ConnectionError)
+    expect(vi.mocked(connect)).not.toHaveBeenCalled()
   })
 })

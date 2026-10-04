@@ -26,7 +26,6 @@ async function main(): Promise<void> {
   console.log("--- Missing credential ---")
   const device = new Device({
     provisioningUrl: "https://api.qualithm.com",
-    broker: { host: "gw.example.qualithm.com" },
     store: createMemoryCredentialStore()
   })
   try {
