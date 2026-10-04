@@ -6,6 +6,14 @@
 
 import type { CapabilityDeclaration } from "./capability.js"
 
+/** A gateway the device connects to over MQTT/TLS. */
+export type BrokerEndpoint = {
+  /** Gateway host, e.g. `gw.sg-sin-a.qualithm.com`. */
+  host: string
+  /** TLS port. */
+  port: number
+}
+
 /** Which credential mechanism a device authenticates with. */
 export type CredentialKind = "token" | "cert"
 
@@ -38,6 +46,11 @@ export type DeviceCredential = {
   issuedAt: string
   /** ISO-8601 expiry, when the credential is time-bounded. */
   expiresAt?: string
+  /**
+   * The gateway the platform assigned for the device's zone at claim or certificate enrollment.
+   * Used when no broker host is configured.
+   */
+  broker?: BrokerEndpoint
 }
 
 /**
@@ -73,9 +86,12 @@ export type CredentialStore = {
 
 /** MQTT gateway connection settings. */
 export type BrokerOptions = {
-  /** Gateway host, e.g. `gw.de-fra-a.qualithm.com`. */
-  host: string
-  /** TLS port. Defaults to `8883`. */
+  /**
+   * Gateway host. Leave unset to use the broker the platform returned at enrollment; set it only
+   * to override that.
+   */
+  host?: string
+  /** TLS port. Overrides the enrolled broker's port; `8883` when `host` is set without a port. */
   port?: number
   /** PEM CA bundle used to trust the gateway server certificate. */
   ca?: string | string[]
@@ -85,10 +101,10 @@ export type BrokerOptions = {
 
 /** Options for constructing a {@link Device}. */
 export type DeviceOptions = {
-  /** Provisioning API base URL, e.g. `https://api.qualithm.com`. */
+  /** Provisioning API base URL for the device's environment, e.g. `https://api.qualithm.com`. */
   provisioningUrl: string
-  /** MQTT gateway connection settings. */
-  broker: BrokerOptions
+  /** MQTT gateway connection settings. The host defaults to the broker returned at enrollment. */
+  broker?: BrokerOptions
   /** One-time claim code, used only on first boot when no credential is stored. */
   claimCode?: string
   /** Optional human-friendly device name set at claim time. */

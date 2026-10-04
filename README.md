@@ -41,7 +41,6 @@ import { Device } from "@qualithm/device"
 
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
-  broker: { host: "gw.de-fra-a.qualithm.com" },
   claimCode: process.env.QUALITHM_CLAIM_CODE
 })
 
@@ -54,6 +53,23 @@ await device.publish("telemetry/temperature", JSON.stringify({ c: 21.4 }))
 On first boot the SDK exchanges the claim code at `POST /provision/claim` and persists the returned
 credential. On every subsequent boot it loads the stored credential and skips claiming — claim codes
 are single-use, so a power cycle never re-claims.
+
+### Environments and the gateway
+
+Set `provisioningUrl` to the API of the environment the claim code came from:
+
+| Environment | `provisioningUrl`               |
+| ----------- | ------------------------------- |
+| Production  | `https://api.qualithm.com`      |
+| Test        | `https://api.test.qualithm.com` |
+
+You don't configure the MQTT gateway. The claim response names the gateway for the device's zone,
+and the SDK stores it with the credential, so every later boot connects to the same gateway.
+`GET /zones` on the same API lists each zone's gateway.
+
+To connect somewhere else, such as a local broker, set `broker.host` (and `broker.port`). A
+configured host always wins over the claimed one. A credential stored by an SDK version before the
+claimed broker has none, so it needs `broker.host` or a fresh claim.
 
 ## Usage
 
@@ -90,7 +106,6 @@ register a handler per commandable key:
 ```ts
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
-  broker: { host: "gw.de-fra-a.qualithm.com" },
   claimCode: process.env.QUALITHM_CLAIM_CODE,
   capabilities: [
     { key: "power", type: "onoff" },
@@ -121,7 +136,6 @@ credential, drops the AP, and hands off to `connect()`:
 ```ts
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
-  broker: { host: "gw.de-fra-a.qualithm.com" },
   name: "field-gateway"
 })
 

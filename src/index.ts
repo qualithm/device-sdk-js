@@ -54,6 +54,7 @@ export { createNmcliAccessPoint, hotspotCommands } from "./access-point.js"
 
 // Types
 export type {
+  BrokerEndpoint,
   BrokerOptions,
   ConnectionState,
   CredentialKind,

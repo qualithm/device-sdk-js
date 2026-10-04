@@ -7,7 +7,7 @@
  */
 
 import { ClaimError } from "./errors.js"
-import type { CredentialKind, DeviceCredential } from "./types.js"
+import type { BrokerEndpoint, CredentialKind, DeviceCredential } from "./types.js"
 
 /** Body sent to the provisioning endpoint. */
 export type ClaimRequest = {
@@ -22,6 +22,7 @@ type ClaimData = {
   spaceId: string
   teamId: string
   secret: string
+  broker?: unknown
   credential?: {
     kind?: CredentialKind
     expiresAt?: string | null
@@ -35,6 +36,27 @@ type ClaimEnvelope = {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
+
+/**
+ * Read the `broker` a provisioning response carries. An older platform omits it, and a malformed
+ * value is ignored rather than trusted, so either leaves the device on its configured broker.
+ *
+ * @param value - The response's `data.broker`
+ * @returns The broker, or `undefined` when absent or malformed
+ */
+export const parseBroker = (value: unknown): BrokerEndpoint | undefined => {
+  if (typeof value !== "object" || value === null) {
+    return undefined
+  }
+  const { host, port } = value as { host?: unknown; port?: unknown }
+  if (typeof host !== "string" || host === "" || typeof port !== "number") {
+    return undefined
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return undefined
+  }
+  return { host, port }
+}
 
 const safeJson = async (response: Response): Promise<unknown> => {
   try {
@@ -75,6 +97,7 @@ export const claimDevice = async (
     throw new ClaimError(message, { status: response.status })
   }
 
+  const broker = parseBroker(data.broker)
   return {
     deviceId: data.deviceId,
     teamId: data.teamId,
@@ -82,6 +105,7 @@ export const claimDevice = async (
     kind: data.credential?.kind ?? "token",
     token: data.secret,
     issuedAt: new Date().toISOString(),
-    ...(typeof data.credential?.expiresAt === "string" && { expiresAt: data.credential.expiresAt })
+    ...(typeof data.credential?.expiresAt === "string" && { expiresAt: data.credential.expiresAt }),
+    ...(broker !== undefined && { broker })
   }
 }
