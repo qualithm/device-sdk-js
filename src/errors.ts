@@ -1,5 +1,5 @@
 /**
- * Error hierarchy for the Qualithm device SDK.
+ * Error hierarchy for the Qualithm Device SDK.
  *
  * All errors extend {@link QualithmDeviceError}. Use the static `isError()`
  * method on each class for type narrowing without `instanceof`.
@@ -126,7 +126,7 @@ export class CapabilityError extends QualithmDeviceError {
   }
 }
 
-/** Failure of the soft-AP provisioning server lifecycle (Decision #280). */
+/** Failure of the soft-AP provisioning server lifecycle (Decision qualithm/pm#763). */
 export class ProvisioningError extends QualithmDeviceError {
   /** Discriminant tag — always `"ProvisioningError"`. */
   override readonly tag = PROVISIONING_ERROR_TAG
