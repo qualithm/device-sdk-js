@@ -123,7 +123,7 @@ export class Device {
   private state: ConnectionState = "idle"
   /**
    * The event payload ceiling the gateway advertised in CONNACK
-   * (`maximumPacketSize`, platform#559). `null` until the first successful
+   * (`maximumPacketSize`, qualithm/pm#126). `null` until the first successful
    * connect; the publish guard only fires once the gateway has told us the
    * limit, so an unadvertised connection is never blocked client-side.
    */
@@ -169,7 +169,7 @@ export class Device {
    * Register a handler for commands addressed to one capability key.
    *
    * The SDK subscribes `command/#` once and dispatches by key, decoding the
-   * Decision #241 payload first: a settable capability's handler receives the
+   * Decision qualithm/pm#747 payload first: a settable capability's handler receives the
    * decoded value; a `trigger` capability's handler is invoked with no value.
    * A malformed payload or a throwing handler is reported through `onError`
    * without interrupting dispatch. Returns an unregister function.
@@ -202,7 +202,7 @@ export class Device {
   }
 
   /**
-   * Start soft-AP provisioning mode (Decision #280): serve the claim exchange
+   * Start soft-AP provisioning mode (Decision qualithm/pm#763): serve the claim exchange
    * on the device's setup network until the companion app claims the device.
    *
    * Only available before a gateway session exists — never alongside one. A
@@ -256,7 +256,7 @@ export class Device {
    * Publish a payload to a (device-relative) topic.
    *
    * @throws {@link PayloadTooLargeError} when the payload exceeds the ceiling
-   * the gateway advertised in CONNACK (platform#559) — caught before the bytes
+   * the gateway advertised in CONNACK (qualithm/pm#126) — caught before the bytes
    * go on the wire, so the device is told rather than silently dropped.
    */
   async publish(
@@ -467,7 +467,7 @@ export class Device {
     await new Promise<void>((resolve, reject) => {
       const onConnect = (connack?: { properties?: { maximumPacketSize?: number } }): void => {
         client.removeListener("error", onError)
-        // Capture the gateway's advertised event ceiling (platform#559) for the
+        // Capture the gateway's advertised event ceiling (qualithm/pm#126) for the
         // publish guard. An absent property leaves the guard inert.
         const advertised = connack?.properties?.maximumPacketSize
         this.maxEventBytes = typeof advertised === "number" ? advertised : null

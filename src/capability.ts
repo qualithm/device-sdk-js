@@ -1,5 +1,5 @@
 /**
- * Device capabilities and the command wire format (Decision #241).
+ * Device capabilities and the command wire format (Decision qualithm/pm#747).
  *
  * A device declares what it can do as a manifest published to the reserved
  * `capabilities` topic on connect; the platform delivers commands to a live
@@ -9,7 +9,7 @@
 
 import { CapabilityError, CommandError } from "./errors.js"
 
-/** The capability kinds a device may declare (Decision #241). */
+/** The capability kinds a device may declare (Decision qualithm/pm#747). */
 export type CapabilityType = "onoff" | "range" | "enum" | "trigger" | "sensor"
 
 /** A JSON-serializable value carried by a command payload. */
@@ -193,7 +193,7 @@ export function buildManifest(declarations: CapabilityDeclaration[]): Capability
 }
 
 /**
- * Decode an inbound command payload against the Decision #241 wire format:
+ * Decode an inbound command payload against the Decision qualithm/pm#747 wire format:
  * always a JSON object — `{"value": ...}` for settable types, `{}` for a
  * trigger. Anything else throws a {@link CommandError}.
  */
