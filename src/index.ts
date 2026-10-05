@@ -1,5 +1,5 @@
 /**
- * Qualithm device SDK — one-call claim, credential persistence, and
+ * Qualithm Device SDK — one-call claim, credential persistence, and
  * MQTT-over-TLS connectivity for JavaScript and TypeScript runtimes.
  *
  * @packageDocumentation
@@ -37,7 +37,7 @@ export {
 // Stores
 export { createFileCredentialStore, createMemoryCredentialStore } from "./store.js"
 
-// Soft-AP provisioning server (Decision #280)
+// Soft-AP provisioning server (Decision qualithm/pm#763)
 export type {
   AccessPointController,
   ClaimExchange,
@@ -48,7 +48,7 @@ export type {
 } from "./provision-server.js"
 export { ProvisioningServer } from "./provision-server.js"
 
-// Reference setup access point for the Pi/Node path (platform#169)
+// Reference setup access point for the Pi/Node path (qualithm/pm#201)
 export type { HotspotCommands, NmcliAccessPointOptions } from "./access-point.js"
 export { createNmcliAccessPoint, hotspotCommands } from "./access-point.js"
 
@@ -63,7 +63,7 @@ export type {
   DeviceOptions
 } from "./types.js"
 
-// Capabilities & commands (Decision #241)
+// Capabilities & commands (Decision qualithm/pm#747)
 export type {
   CapabilityDeclaration,
   CapabilityManifest,

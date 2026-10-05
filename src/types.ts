@@ -1,5 +1,5 @@
 /**
- * Public types for the Qualithm device SDK.
+ * Public types for the Qualithm Device SDK.
  *
  * @packageDocumentation
  */
@@ -113,7 +113,7 @@ export type DeviceOptions = {
   store?: CredentialStore
   /**
    * Capabilities the device declares to the platform, published as a manifest
-   * on every connect (Decision #241). Invalid declarations throw a
+   * on every connect (Decision qualithm/pm#747). Invalid declarations throw a
    * `CapabilityError` from the constructor.
    */
   capabilities?: CapabilityDeclaration[]
