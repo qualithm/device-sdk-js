@@ -1,6 +1,6 @@
 /**
  * A reference {@link AccessPointController} for the Pi/Node path
- * (platform#169): brings up the device's `qualithm-setup-*` network as a
+ * (qualithm/pm#201): brings up the device's `qualithm-setup-*` network as a
  * NetworkManager hotspot on a credential-less device and tears it down once
  * the claim lands. Raspberry Pi OS and most Linux distros manage Wi-Fi with
  * NetworkManager, so `nmcli` is the mechanism; the commands are constructed

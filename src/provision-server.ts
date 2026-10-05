@@ -1,6 +1,6 @@
 /**
  * Soft-AP provisioning server: the device-side endpoint the companion app
- * talks to on the device's setup network (Decision #280).
+ * talks to on the device's setup network (Decision qualithm/pm#763).
  *
  * When the device has no credential, the server advertises itself at
  * `GET /provision/info` and accepts the claim exchange at

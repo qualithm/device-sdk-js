@@ -104,6 +104,8 @@ before sending it. Declare capabilities once — the manifest is published on ev
 register a handler per commandable key:
 
 ```ts
+import { Device } from "@qualithm/device"
+
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
   claimCode: process.env.QUALITHM_CLAIM_CODE,
@@ -129,18 +131,21 @@ through `onError` and never reaches the handler. To change the capability set at
 ### Soft-AP provisioning
 
 For onboarding without a terminal — the companion-app flow — the device serves the claim exchange
-itself. While no credential is stored, `startProvisioning()` brings up the setup access point (via a
-deployment-supplied controller) and serves the exchange on it. A successful claim persists the
+itself. While no credential is stored, `startProvisioning()` brings up the setup access point
+through an `AccessPointController` and serves the exchange on it. On a NetworkManager host such as
+Raspberry Pi OS, `createNmcliAccessPoint` is that controller. A successful claim persists the
 credential, drops the AP, and hands off to `connect()`:
 
 ```ts
+import { createNmcliAccessPoint, Device } from "@qualithm/device"
+
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
   name: "field-gateway"
 })
 
 await device.startProvisioning({
-  accessPoint: nmcliSoftAp(), // deployment-supplied AP bring-up/teardown
+  accessPoint: createNmcliAccessPoint({ ssid: "qualithm-setup-field-gateway" }),
   onProvisioned: () => device.connect()
 })
 ```
