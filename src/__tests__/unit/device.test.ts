@@ -14,6 +14,7 @@ class FakeMqttClient extends EventEmitter {
   publishCalls: { topic: string; message: unknown }[] = []
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false
+  forced = false
   publish(topic: string, message: unknown, _opts: unknown, cb: (error?: Error) => void): void {
     this.publishCalls.push({ topic, message })
     cb()
@@ -22,9 +23,10 @@ class FakeMqttClient extends EventEmitter {
     this.subscribeCalls.push({ topic })
     cb(null)
   }
-  end(_force: boolean, _opts: unknown, cb: () => void): void {
+  end(force?: boolean, _opts?: unknown, cb?: () => void): void {
     this.ended = true
-    cb()
+    this.forced = force === true
+    cb?.()
   }
 }
 
@@ -195,6 +197,54 @@ describe("Device errors", () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     client.emit("error", new Error("refused"))
     await expect(pending).rejects.toBeInstanceOf(ConnectionError)
+  })
+
+  it("ends the client and returns to idle when the first connect fails", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    const client = new FakeMqttClient()
+    vi.mocked(connect).mockReturnValue(client as unknown as MqttClient)
+    const pending = device.connect()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const cause = new Error("unable to get local issuer certificate")
+    client.emit("error", cause)
+    await expect(pending).rejects.toMatchObject({ cause })
+
+    expect(client.ended).toBe(true)
+    expect(client.forced).toBe(true)
+    expect(device.connectionState).toBe("idle")
+    // No lingering client: the handle reports not connected.
+    await expect(device.publish("t", "x")).rejects.toThrow("Device is not connected")
+  })
+
+  it("can retry connect after a failed first connect", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    const failing = new FakeMqttClient()
+    vi.mocked(connect).mockReturnValue(failing as unknown as MqttClient)
+    const pending = device.connect()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    failing.emit("error", new Error("refused"))
+    await expect(pending).rejects.toBeInstanceOf(ConnectionError)
+
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+    expect(device.connectionState).toBe("connected")
+    await device.publish("telemetry", "hi")
+    expect(client.publishCalls).toHaveLength(1)
+  })
+
+  it("keeps an established session's client open across a drop", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+
+    client.emit("close")
+    client.emit("error", new Error("reset"))
+    client.emit("reconnect")
+    expect(client.ended).toBe(false)
+    expect(device.connectionState).toBe("reconnecting")
+
+    client.emit("connect", { properties: {} })
+    expect(device.connectionState).toBe("connected")
   })
 
   it("connects via the certificate path", async () => {

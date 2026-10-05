@@ -341,7 +341,17 @@ export class Device {
     const client = connect(this.buildClientOptions(credential))
     this.client = client
     this.bindClientEvents(client)
-    await this.waitForConnect(client)
+    try {
+      await this.waitForConnect(client)
+    } catch (error) {
+      // A failed first connect must not leave mqtt.js reconnecting in the
+      // background, which keeps the process alive. Reconnects after an
+      // established session are handled by the client and never reach here.
+      this.client = null
+      this.setState("idle")
+      client.end(true)
+      throw error
+    }
     await this.publishManifest()
     await this.ensureCommandSubscription()
   }
