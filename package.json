@@ -1,6 +1,6 @@
 {
   "name": "@qualithm/device",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Device provisioning and connectivity SDK for JavaScript and TypeScript runtimes.",
   "private": false,
   "type": "module",
