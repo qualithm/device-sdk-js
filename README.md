@@ -47,8 +47,15 @@ const device = new Device({
 device.onState((state) => console.log("state:", state))
 
 await device.connect()
-await device.publish("telemetry/temperature", JSON.stringify({ c: 21.4 }))
+await device.publish(
+  "telemetry",
+  JSON.stringify({ ts: Date.now(), metrics: { temperature: 21.4 } })
+)
 ```
+
+The platform stores readings published to the `telemetry` topic as `{ ts, metrics }`: `ts` is the
+reading time in epoch milliseconds, and `metrics` maps each metric name to a number. Other topics
+reach the gateway but aren't stored as readings.
 
 On first boot the SDK exchanges the claim code at `POST /provision/claim` and persists the returned
 credential. On every subsequent boot it loads the stored credential and skips claiming — claim codes

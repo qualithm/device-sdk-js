@@ -46,7 +46,10 @@ async function main(): Promise<void> {
 
   console.log("\n--- Claim once, then connect over MQTT-TLS ---")
   await device.connect()
-  await device.publish("telemetry/temperature", JSON.stringify({ c: 21.4 }))
+  await device.publish(
+    "telemetry",
+    JSON.stringify({ ts: Date.now(), metrics: { temperature: 21.4 } })
+  )
   console.log("  published telemetry")
   await device.disconnect()
   console.log("\nDone.")
