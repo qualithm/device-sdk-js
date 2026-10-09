@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { ClaimError, ProvisioningError } from "../../errors.js"
 import {
   type AccessPointController,
+  type HomeNetwork,
+  type HomeNetworkController,
   ProvisioningServer,
   type ProvisioningServerOptions
 } from "../../provision-server.js"
@@ -276,6 +278,151 @@ describe("POST /provision/claim", () => {
     expect(response.status).toBe(500)
     expect(server.state).toBe("serving")
     expect(await store.load()).toBeNull()
+    await server.stop()
+  })
+})
+
+describe("ProvisioningServer home network onboarding", () => {
+  const network = { ssid: "home", passphrase: "hunter22" }
+
+  const homeNetworkFake = (
+    order: string[],
+    joinError?: Error
+  ): HomeNetworkController & { joined: HomeNetwork[]; forgotten: number } => ({
+    joined: [],
+    forgotten: 0,
+    join(details) {
+      order.push("join")
+      this.joined.push(details)
+      if (joinError !== undefined) {
+        throw joinError
+      }
+    },
+    forget() {
+      order.push("forget")
+      this.forgotten += 1
+    }
+  })
+
+  const waitFor = async (check: () => boolean): Promise<void> => {
+    for (let i = 0; i < 200 && !check(); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(check()).toBe(true)
+  }
+
+  it("answers 202 without the identity, then joins and claims after the access point is down", async () => {
+    const order: string[] = []
+    const homeNetwork = homeNetworkFake(order)
+    const exchange = vi.fn(async () => {
+      order.push("claim")
+      return Promise.resolve(credential)
+    })
+    let provisioned = false
+    const { server, store, url } = await startServer({
+      homeNetwork,
+      exchange,
+      accessPoint: {
+        start() {
+          order.push("ap-start")
+        },
+        stop() {
+          order.push("ap-stop")
+        }
+      },
+      onProvisioned: () => {
+        provisioned = true
+      }
+    })
+
+    const response = await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", name: "kitchen", ...network })
+    })
+    expect(response.status).toBe(202)
+    expect((await response.json()) as Record<string, unknown>).toEqual({ status: "joining" })
+
+    await waitFor(() => provisioned)
+    expect(order).toEqual(["ap-start", "ap-stop", "join", "claim"])
+    expect(homeNetwork.joined).toEqual([network])
+    expect(exchange).toHaveBeenCalledWith({ code: "qmc_x.y", name: "kitchen" })
+    expect((await store.load())?.token).toBe("qmd_secret")
+    expect(server.state).toBe("provisioned")
+    await expect(fetch(`${url}/provision/info`)).rejects.toThrow()
+  })
+
+  it("forgets the network and brings the access point back when the join fails", async () => {
+    const order: string[] = []
+    const homeNetwork = homeNetworkFake(order, new Error("wrong passphrase"))
+    const exchange = vi.fn(async () => Promise.resolve(credential))
+    const errors: Error[] = []
+    const { server, store, url, accessPoint } = await startServer({
+      homeNetwork,
+      exchange,
+      onError: (error) => errors.push(error)
+    })
+
+    const response = await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", ...network })
+    })
+    expect(response.status).toBe(202)
+
+    await waitFor(() => server.state === "serving")
+    expect(order).toEqual(["join", "forget"])
+    expect(exchange).not.toHaveBeenCalled()
+    expect(accessPoint.stopped).toBe(1)
+    expect(accessPoint.started).toBe(2)
+    expect(await store.load()).toBeNull()
+    expect(errors[0]).toBeInstanceOf(ProvisioningError)
+    expect((errors[0] as Error & { cause?: Error }).cause?.message).toBe("wrong passphrase")
+    await server.stop()
+  })
+
+  it("forgets the network and restarts onboarding when the claim fails", async () => {
+    const order: string[] = []
+    const homeNetwork = homeNetworkFake(order)
+    const exchange = async (): Promise<DeviceCredential> =>
+      Promise.reject(new ClaimError("Claim code expired", { status: 401 }))
+    const { server, store, url } = await startServer({ homeNetwork, exchange })
+
+    await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", ...network })
+    })
+
+    await waitFor(() => server.state === "serving")
+    expect(order).toEqual(["join", "forget"])
+    expect(await store.load()).toBeNull()
+
+    // Onboarding restarts cleanly on the new listener.
+    const { port } = server.boundAddress ?? { port: 0 }
+    const info = await fetch(`http://127.0.0.1:${String(port)}/provision/info`)
+    expect(info.status).toBe(200)
+    await server.stop()
+  })
+
+  it("refuses Wi-Fi details when the deployment can't join a network", async () => {
+    const { server, url } = await startServer()
+    const response = await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", ...network })
+    })
+    expect(response.status).toBe(501)
+    expect(server.state).toBe("serving")
+    await server.stop()
+  })
+
+  it("rejects half the Wi-Fi details with 400", async () => {
+    const { server, url } = await startServer({ homeNetwork: homeNetworkFake([]) })
+    for (const extra of [{ ssid: "home" }, { passphrase: "x" }, { ssid: "", passphrase: "x" }]) {
+      const response = await fetch(`${url}/provision/claim`, {
+        method: "POST",
+        body: JSON.stringify({ code: "qmc_x.y", ...extra })
+      })
+      expect(response.status).toBe(400)
+    }
+    expect(server.state).toBe("serving")
     await server.stop()
   })
 })
