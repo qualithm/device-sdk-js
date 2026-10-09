@@ -9,6 +9,12 @@
  * the setup access point before {@link ProvisioningServerOptions.onProvisioned}
  * runs, so the claim endpoint is never served alongside a gateway session. A
  * failed claim leaves the server running, so onboarding can restart cleanly.
+ *
+ * When the claim also carries home Wi-Fi details, the device answers first,
+ * then drops the access point, joins the home network and claims from there
+ * (Decision qualithm/pm#763, qualithm/pm#1497 amendment), so a single-radio
+ * device has a route to the platform. A failed join or claim forgets the
+ * network and brings the access point back.
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
@@ -22,7 +28,7 @@ const CLAIM_PATH = "/provision/claim"
 const MAX_BODY_BYTES = 16 * 1024
 
 /** Lifecycle state of a {@link ProvisioningServer}. */
-export type ProvisioningServerState = "idle" | "serving" | "provisioned" | "closed"
+export type ProvisioningServerState = "idle" | "serving" | "onboarding" | "provisioned" | "closed"
 
 /**
  * Deployment-supplied control over the OS-level setup access point
@@ -35,6 +41,32 @@ export type AccessPointController = {
   start: () => void | Promise<void>
   /** Tear the setup access point down. */
   stop: () => void | Promise<void>
+}
+
+/** Home Wi-Fi details the companion app sends with the claim code. */
+export type HomeNetwork = {
+  /** The home network's SSID. */
+  ssid: string
+  /** Its passphrase; empty for an open network. */
+  passphrase: string
+}
+
+/**
+ * Deployment-supplied control over the device's home network connection
+ * (wpa_supplicant, NetworkManager, …). The server joins only after the setup
+ * access point is down.
+ */
+export type HomeNetworkController = {
+  /** Join the home network. Rejects when it isn't found or the passphrase is wrong. */
+  join: (network: HomeNetwork) => void | Promise<void>
+  /** Leave the home network and drop anything stored for it. */
+  forget: () => void | Promise<void>
+}
+
+/** Body of `POST /provision/claim` while the device joins the home network. */
+export type OnboardingAccepted = {
+  /** Always `"joining"`: the device is leaving the setup network to claim. */
+  status: "joining"
 }
 
 /** Body of `GET /provision/info` while the server awaits a claim. */
@@ -76,6 +108,11 @@ export type ProvisioningServerOptions = {
   port?: number
   /** Setup access point lifecycle hook, supplied by the deployment. */
   accessPoint?: AccessPointController
+  /**
+   * Home network hook, supplied by the deployment. Without it the device
+   * claims over the setup network and refuses claims that carry Wi-Fi details.
+   */
+  homeNetwork?: HomeNetworkController
   /** Claim exchange override. Defaults to {@link claimDevice}. */
   exchange?: ClaimExchange
   /**
@@ -113,11 +150,14 @@ const readBody = async (req: IncomingMessage): Promise<Buffer> => {
   return Buffer.concat(chunks)
 }
 
+type ParsedClaim = { claim: ClaimRequest; network?: HomeNetwork }
+
 /**
- * Parse and validate a claim request body. Returns the claim request, or
- * `null` when the body is not a JSON object with a non-empty string `code`.
+ * Parse and validate a claim request body. Returns the claim request and any
+ * home Wi-Fi details, or `null` when the body is not a JSON object with a
+ * non-empty string `code`, or carries only half of the Wi-Fi details.
  */
-const parseClaimRequest = (raw: Buffer): ClaimRequest | null => {
+const parseClaimRequest = (raw: Buffer): ParsedClaim | null => {
   let body: unknown
   try {
     body = JSON.parse(raw.toString("utf8"))
@@ -127,14 +167,21 @@ const parseClaimRequest = (raw: Buffer): ClaimRequest | null => {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return null
   }
-  const { code, name } = body as Record<string, unknown>
+  const { code, name, ssid, passphrase } = body as Record<string, unknown>
   if (typeof code !== "string" || code === "") {
     return null
   }
   if (name !== undefined && typeof name !== "string") {
     return null
   }
-  return { code, ...(name !== undefined && { name }) }
+  const claim: ClaimRequest = { code, ...(name !== undefined && { name }) }
+  if (ssid === undefined && passphrase === undefined) {
+    return { claim }
+  }
+  if (typeof ssid !== "string" || ssid === "" || typeof passphrase !== "string") {
+    return null
+  }
+  return { claim, network: { ssid, passphrase } }
 }
 
 /**
@@ -275,7 +322,7 @@ export class ProvisioningServer {
   }
 
   private async handleClaim(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (this.serverState === "provisioned") {
+    if (this.serverState === "provisioned" || this.serverState === "onboarding") {
       sendJson(res, 409, { message: "The device is already provisioned" })
       return
     }
@@ -287,9 +334,27 @@ export class ProvisioningServer {
       sendJson(res, 413, { message: "Request body too large" })
       return
     }
-    const claim = parseClaimRequest(raw)
-    if (claim === null) {
-      sendJson(res, 400, { message: "Expected a JSON body with a claim code" })
+    const parsed = parseClaimRequest(raw)
+    if (parsed === null) {
+      sendJson(res, 400, {
+        message: "Expected a JSON body with a claim code, and both ssid and passphrase or neither"
+      })
+      return
+    }
+    const { claim, network } = parsed
+
+    if (network !== undefined) {
+      const { homeNetwork } = this.options
+      if (homeNetwork === undefined) {
+        sendJson(res, 501, { message: "This device can't join a home network" })
+        return
+      }
+      this.serverState = "onboarding"
+      const accepted: OnboardingAccepted = { status: "joining" }
+      res.writeHead(202, { "content-type": "application/json", connection: "close" })
+      res.end(JSON.stringify(accepted), () => {
+        void this.onboard(claim, network, homeNetwork)
+      })
       return
     }
 
@@ -335,6 +400,56 @@ export class ProvisioningServer {
       await this.closeHttp()
       await this.stopAccessPoint()
       await this.options.onProvisioned?.(credential)
+    } catch (error) {
+      this.reportError(asError(error))
+    }
+  }
+
+  /**
+   * Leave the setup network, join the home network and claim from there.
+   * Runs only after the 202 has flushed. Any failure forgets the network and
+   * restarts onboarding, so the passphrase never outlives a failed attempt.
+   */
+  private async onboard(
+    claim: ClaimRequest,
+    network: HomeNetwork,
+    homeNetwork: HomeNetworkController
+  ): Promise<void> {
+    let credential: DeviceCredential
+    try {
+      await this.closeHttp()
+      await this.stopAccessPoint()
+      await homeNetwork.join(network)
+      credential = await this.exchange(claim)
+      await this.options.store.save(credential)
+    } catch (error) {
+      await this.restartOnboarding(homeNetwork, error)
+      return
+    }
+
+    this.serverState = "provisioned"
+    try {
+      await this.options.onProvisioned?.(credential)
+    } catch (error) {
+      this.reportError(asError(error))
+    }
+  }
+
+  private async restartOnboarding(
+    homeNetwork: HomeNetworkController,
+    cause: unknown
+  ): Promise<void> {
+    this.reportError(
+      new ProvisioningError("Onboarding failed; bringing the setup access point back", { cause })
+    )
+    try {
+      await homeNetwork.forget()
+    } catch (error) {
+      this.reportError(asError(error))
+    }
+    this.serverState = "idle"
+    try {
+      await this.start()
     } catch (error) {
       this.reportError(asError(error))
     }

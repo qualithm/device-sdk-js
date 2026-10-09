@@ -162,6 +162,13 @@ The companion app joins the setup network, reads `GET /provision/info`, and post
 a credential exists, and a successful claim stops it before the MQTT session opens. A failed claim
 (bad code, unreachable platform) leaves the server running, so onboarding can be retried.
 
+A single-radio device can't reach the platform while it hosts the setup network. Supply a
+`HomeNetworkController` as `homeNetwork`, and the companion app sends the home Wi-Fi `ssid` and
+`passphrase` with the claim code. The device answers `202 { "status": "joining" }`, drops the access
+point, joins the home network, then claims from there. If the join or the claim fails, it forgets
+the network and brings the access point back, so onboarding restarts. The companion app learns the
+device's identity from the platform, not from the setup network.
+
 ### Error Handling
 
 All errors extend `QualithmDeviceError`; each subclass exposes a static `isError()` for

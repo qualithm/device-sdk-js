@@ -41,6 +41,9 @@ export { createFileCredentialStore, createMemoryCredentialStore } from "./store.
 export type {
   AccessPointController,
   ClaimExchange,
+  HomeNetwork,
+  HomeNetworkController,
+  OnboardingAccepted,
   ProvisionedIdentity,
   ProvisioningInfo,
   ProvisioningServerOptions,
