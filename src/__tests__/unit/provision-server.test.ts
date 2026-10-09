@@ -402,6 +402,66 @@ describe("ProvisioningServer home network onboarding", () => {
     await server.stop()
   })
 
+  it("reports a failing onProvisioned without undoing the claim", async () => {
+    const homeNetwork = homeNetworkFake([])
+    const errors: Error[] = []
+    const { server, store, url } = await startServer({
+      homeNetwork,
+      onProvisioned: () => {
+        throw new Error("connect failed")
+      },
+      onError: (error) => errors.push(error)
+    })
+
+    await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", ...network })
+    })
+
+    await waitFor(() => errors.length > 0)
+    expect(errors[0]?.message).toBe("connect failed")
+    expect(server.state).toBe("provisioned")
+    expect((await store.load())?.token).toBe("qmd_secret")
+    expect(homeNetwork.forgotten).toBe(0)
+  })
+
+  it("still restarts onboarding when forgetting the network or restarting fails", async () => {
+    const homeNetwork = {
+      ...homeNetworkFake([], new Error("network not found")),
+      forget() {
+        throw new Error("forget failed")
+      }
+    }
+    let starts = 0
+    const errors: Error[] = []
+    const { server, url } = await startServer({
+      homeNetwork,
+      accessPoint: {
+        start() {
+          starts += 1
+          if (starts > 1) {
+            throw new Error("radio busy")
+          }
+        },
+        stop: vi.fn()
+      },
+      onError: (error) => errors.push(error)
+    })
+
+    await fetch(`${url}/provision/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: "qmc_x.y", ...network })
+    })
+
+    await waitFor(() => errors.length >= 3)
+    expect(errors.map((error) => error.message)).toEqual([
+      "Onboarding failed; bringing the setup access point back",
+      "forget failed",
+      "Failed to start the setup access point"
+    ])
+    expect(server.state).toBe("idle")
+  })
+
   it("refuses Wi-Fi details when the deployment can't join a network", async () => {
     const { server, url } = await startServer()
     const response = await fetch(`${url}/provision/claim`, {
