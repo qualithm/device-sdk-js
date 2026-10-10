@@ -160,7 +160,7 @@ describe("command dispatch", () => {
     expect(received).toEqual([true])
   })
 
-  it("matches the Decision #241 payload shapes for every commandable type", async () => {
+  it("matches the Decision qualithm/pm#747 payload shapes for every commandable type", async () => {
     const { device, client } = await newDevice()
     const received: unknown[] = []
     device.onCommand<boolean>("power", (value) => received.push(value))
