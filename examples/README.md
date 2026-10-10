@@ -2,6 +2,16 @@
 
 Runnable examples demonstrating `@qualithm/device` usage.
 
+## Environment Variables
+
+All are optional. `basic-usage.ts` reads all three; `softap-provisioning.ts` reads `QUALITHM_API`.
+
+| Variable              | Description                                                                              | Default                    |
+| --------------------- | ---------------------------------------------------------------------------------------- | -------------------------- |
+| `QUALITHM_CLAIM_CODE` | Claim code to exchange for a device credential. Unset, the example stops before claiming | None                       |
+| `QUALITHM_API`        | Provisioning API base URL. Set it for a claim code from a non-production environment     | `https://api.qualithm.com` |
+| `QUALITHM_GATEWAY`    | Gateway host to connect to instead of the one in the claim response                      | None                       |
+
 ## Running Examples
 
 ```bash
