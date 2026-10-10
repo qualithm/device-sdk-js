@@ -113,7 +113,7 @@ describe("Device connect (token)", () => {
     expect(client.subscribeCalls).toHaveLength(1)
   })
 
-  it("rejects an oversize publish before it reaches the wire (platform#559)", async () => {
+  it("rejects an oversize publish before it reaches the wire (qualithm/pm#126)", async () => {
     const limited = newDevice(await seededStore(tokenCredential))
     const limitedClient = new FakeMqttClient()
     await connectWithLimit(limited, limitedClient, 8)

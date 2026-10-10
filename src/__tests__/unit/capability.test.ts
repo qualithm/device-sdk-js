@@ -12,7 +12,7 @@ import { CapabilityError, CommandError } from "../../errors.js"
 const encoder = new TextEncoder()
 
 describe("buildManifest", () => {
-  it("builds the Decision #241 manifest shape for every capability type", () => {
+  it("builds the Decision qualithm/pm#747 manifest shape for every capability type", () => {
     const manifest = buildManifest([
       { key: "power", type: "onoff" },
       { key: "brightness", type: "range", min: 0, max: 100, step: 1, unit: "percent" },
@@ -86,7 +86,7 @@ describe("buildManifest", () => {
 })
 
 describe("decodeCommandPayload", () => {
-  it("decodes the Decision #241 shapes", () => {
+  it("decodes the Decision qualithm/pm#747 shapes", () => {
     expect(decodeCommandPayload(encoder.encode("{}"))).toEqual({ kind: "trigger" })
     expect(decodeCommandPayload(encoder.encode('{"value":true}'))).toEqual({
       kind: "value",
