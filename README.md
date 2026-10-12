@@ -8,6 +8,10 @@ Device provisioning and connectivity SDK for JavaScript and TypeScript runtimes.
 lifecycle behind a single `connect()` call — claim once, persist the credential, and maintain an
 auto-reconnecting MQTT-over-TLS session — on Node, Bun, and Deno.
 
+**Not for deployed devices.** The SDK keeps the device credential in a file, and anyone with access
+to the device can read it. Don't deploy a device built on this SDK until it supports protected
+credential storage.
+
 ## Features
 
 - **One-call `connect()`** — claim a device, persist its credential, and open an MQTT-over-TLS
@@ -139,9 +143,9 @@ through `onError` and never reaches the handler. To change the capability set at
 
 For onboarding without a terminal — the companion-app flow — the device serves the claim exchange
 itself. While no credential is stored, `startProvisioning()` brings up the setup access point
-through an `AccessPointController` and serves the exchange on it. On a NetworkManager host such as
-Raspberry Pi OS, `createNmcliAccessPoint` is that controller. A successful claim persists the
-credential, drops the AP, and hands off to `connect()`:
+through an `AccessPointController` and serves the exchange on it. On a NetworkManager host,
+`createNmcliAccessPoint` is that controller. A successful claim persists the credential, drops the
+AP, and hands off to `connect()`:
 
 ```ts
 import { createNmcliAccessPoint, Device } from "@qualithm/device"
