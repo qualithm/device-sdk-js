@@ -11,7 +11,7 @@ import type { BrokerEndpoint, CredentialKind, DeviceCredential } from "./types.j
 
 /** Body sent to the provisioning endpoint. */
 export type ClaimRequest = {
-  /** The single-use claim code (e.g. `qmc_<selector>.<verifier>`). */
+  /** The single-use claim code, as issued: it starts with `qmc_`. */
   code: string
   /** Optional human-friendly device name. */
   name?: string
