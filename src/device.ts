@@ -104,7 +104,10 @@ export const resolveBroker = (
  *   claimCode: process.env.QUALITHM_CLAIM_CODE
  * })
  * await device.connect()
- * await device.publish("telemetry/temperature", JSON.stringify({ c: 21.4 }))
+ * await device.publish(
+ *   "telemetry",
+ *   JSON.stringify({ ts: Date.now(), metrics: { temperature: 21.4 } })
+ * )
  * ```
  */
 export class Device {
