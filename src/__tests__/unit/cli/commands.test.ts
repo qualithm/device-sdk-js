@@ -12,6 +12,7 @@ import type { CredentialStore, DeviceCredential } from "../../../types.js"
 vi.mock("mqtt", () => ({ connect: vi.fn() }))
 
 class FakeMqttClient extends EventEmitter {
+  options: { reconnectPeriod?: number } = {}
   publishCalls: { topic: string; message: unknown }[] = []
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false

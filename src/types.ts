@@ -117,7 +117,11 @@ export type DeviceOptions = {
    * `CapabilityError` from the constructor.
    */
   capabilities?: CapabilityDeclaration[]
-  /** Reconnect backoff in milliseconds. Defaults to `1000`. */
+  /**
+   * Reconnect backoff base in milliseconds. Defaults to `1000`. Each
+   * consecutive failure doubles the ceiling of a random wait, up to 30 s; a
+   * successful connect resets it. `0` disables reconnecting.
+   */
   reconnectPeriodMs?: number
   /** Keep-alive interval in seconds. Defaults to `60`. */
   keepaliveSeconds?: number

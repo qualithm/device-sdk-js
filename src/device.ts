@@ -5,8 +5,8 @@
  *
  * On first boot it exchanges a claim code and stores the resulting credential;
  * on every subsequent boot it loads the stored credential and skips claiming
- * (claim codes are single-use). Transport reconnection and backoff are handled
- * by the underlying MQTT client.
+ * (claim codes are single-use). The underlying MQTT client reconnects; the
+ * device grows its delay exponentially with jitter (`backoff.ts`).
  */
 
 import {
@@ -17,6 +17,7 @@ import {
   type MqttClient
 } from "mqtt"
 
+import { reconnectDelay } from "./backoff.js"
 import {
   buildManifest,
   type CapabilityDeclaration,
@@ -391,6 +392,7 @@ export class Device {
   }
 
   private bindClientEvents(client: MqttClient): void {
+    this.bindReconnectBackoff(client)
     client.on("connect", () => {
       this.setState("connected")
       if (this.hasConnectedOnce) {
@@ -417,6 +419,33 @@ export class Device {
     })
     client.on("error", (error) => {
       this.emitError(error)
+    })
+  }
+
+  /**
+   * mqtt.js 5 retries on a fixed `reconnectPeriod`, but reads that option each
+   * time it arms its retry timer (`_setupReconnect`, from its own `close`
+   * listener or `_cleanUp`). Keeping `client.options.reconnectPeriod` at the
+   * next backoff delay varies the wait per attempt while mqtt.js keeps owning
+   * the timer, so `end()` still clears it and never re-arms it. The `close`
+   * listener is prepended to run before mqtt.js's own.
+   */
+  private bindReconnectBackoff(client: MqttClient): void {
+    const base = this.options.reconnectPeriodMs ?? DEFAULT_RECONNECT_MS
+    if (base <= 0) {
+      return
+    }
+    let failures = 0
+    const arm = (): void => {
+      client.options.reconnectPeriod = reconnectDelay(Math.max(1, failures), base)
+    }
+    client.on("connect", () => {
+      failures = 0
+      arm()
+    })
+    client.prependListener("close", () => {
+      failures += 1
+      arm()
     })
   }
 
