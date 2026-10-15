@@ -11,6 +11,7 @@ import type { CredentialStore, DeviceCredential } from "../../types.js"
 vi.mock("mqtt", () => ({ connect: vi.fn() }))
 
 class FakeMqttClient extends EventEmitter {
+  options: { reconnectPeriod?: number } = {}
   publishCalls: { topic: string; message: unknown }[] = []
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false
@@ -286,6 +287,49 @@ describe("Device errors", () => {
     }
     await expect(device.publish("t", new Uint8Array([1]))).rejects.toThrow("pub")
     await expect(device.subscribe(["t"])).rejects.toThrow("sub")
+  })
+
+  it("backs reconnects off exponentially and resets once connected", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.999999)
+    const device = new Device({
+      provisioningUrl: "https://api.example.com",
+      broker: { host: "gw.example.com" },
+      reconnectPeriodMs: 500,
+      store: await seededStore(tokenCredential)
+    })
+    const client = new FakeMqttClient()
+    // Stands in for mqtt.js arming its retry timer from its own `close` listener.
+    const armed: (number | undefined)[] = []
+    client.on("close", () => {
+      armed.push(client.options.reconnectPeriod)
+    })
+    await connectWith(device, client)
+    expect(client.options.reconnectPeriod).toBe(499)
+
+    client.emit("close")
+    client.emit("close")
+    client.emit("close")
+    expect(armed).toEqual([499, 999, 1999])
+
+    client.emit("connect", { properties: {} })
+    expect(client.options.reconnectPeriod).toBe(499)
+    client.emit("close")
+    expect(armed.at(-1)).toBe(499)
+    vi.mocked(Math.random).mockRestore()
+  })
+
+  it("leaves reconnecting disabled when the base is zero", async () => {
+    const device = new Device({
+      provisioningUrl: "https://api.example.com",
+      broker: { host: "gw.example.com" },
+      reconnectPeriodMs: 0,
+      store: await seededStore(tokenCredential)
+    })
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+    client.emit("close")
+    expect(vi.mocked(connect).mock.calls[0]?.[0]).toMatchObject({ reconnectPeriod: 0 })
+    expect(client.options.reconnectPeriod).toBeUndefined()
   })
 
   it("claims when no credential is stored, then stays closed after disconnect", async () => {
