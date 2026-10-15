@@ -90,8 +90,9 @@ claimed broker has none, so it needs `broker.host` or a fresh claim.
   otherwise it connects directly.
 - **Crash-safe credential store** — the default file store writes to a temp file, `fsync`s, then
   atomically renames, so a power loss mid-write cannot corrupt the credential.
-- **Automatic reconnect** — transport reconnection and backoff are handled by the underlying MQTT
-  client; subscriptions are re-established on resume.
+- **Automatic reconnect** — a dropped or refused connection retries after a random wait whose
+  ceiling doubles from `reconnectPeriodMs` (1 s) up to 30 s, and resets once connected, so a fleet
+  never retries in lockstep. Subscriptions are re-established on resume.
 - **Pluggable storage** — supply your own `CredentialStore` (flash/NVS, secure element, keychain)
   for constrained or hardened targets.
 
