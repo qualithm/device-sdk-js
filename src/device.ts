@@ -51,6 +51,33 @@ const MQTT_PROTOCOL_VERSION = 5
 const COMMAND_TOPIC_PREFIX = "command/"
 const COMMAND_TOPIC_FILTER = "command/#"
 const MANIFEST_TOPIC = "capabilities"
+/** Publishes of one message, including the first, before a failed PUBACK is final. */
+const PUBLISH_ATTEMPTS = 5
+/** The ceiling of the first wait before re-publishing, in milliseconds. */
+const PUBLISH_RETRY_BASE_MS = 500
+/** The largest wait before re-publishing, in milliseconds. */
+const PUBLISH_RETRY_CAP_MS = 10_000
+/** User property naming one message across its re-publishes, for gateway dedup. */
+const MSG_ID_PROPERTY = "msg-id"
+
+/** True when `error` is a PUBACK whose reason code says the gateway did not take the message. */
+const isFailedPuback = (error: Error): boolean =>
+  "code" in error && typeof error.code === "number" && error.code >= 0x80
+
+/** Publish options carrying a `msg-id` user property, keeping one the caller set. */
+const withMsgId = (options: IClientPublishOptions): IClientPublishOptions => {
+  const userProperties = options.properties?.userProperties ?? {}
+  if (MSG_ID_PROPERTY in userProperties) {
+    return options
+  }
+  return {
+    ...options,
+    properties: {
+      ...options.properties,
+      userProperties: { ...userProperties, [MSG_ID_PROPERTY]: crypto.randomUUID() }
+    }
+  }
+}
 
 /** Listener notified on every connection-state transition. */
 export type StateListener = (state: ConnectionState) => void
@@ -259,9 +286,15 @@ export class Device {
   /**
    * Publish a payload to a (device-relative) topic.
    *
+   * A QoS 1 publish carries a `msg-id` user property. When the gateway answers
+   * it with a failed PUBACK (reason code 0x80 or above), it is published again
+   * with the same `msg-id`, after a capped, jittered backoff, so the gateway
+   * stores it once.
+   *
    * @throws {@link PayloadTooLargeError} when the payload exceeds the ceiling
    * the gateway advertised in CONNACK (qualithm/pm#126) — caught before the bytes
    * go on the wire, so the device is told rather than silently dropped.
+   * @throws the last failed PUBACK's error once every attempt has failed.
    */
   async publish(
     topic: string,
@@ -277,8 +310,30 @@ export class Device {
         { maxBytes: max, actualBytes: message.length }
       )
     }
+    const opts = options?.qos === 1 ? withMsgId(options) : (options ?? {})
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.publishOnce(attempt === 1 ? client : this.requireClient(), topic, message, opts)
+        return
+      } catch (error) {
+        if (!(error instanceof Error) || !isFailedPuback(error) || attempt >= PUBLISH_ATTEMPTS) {
+          throw error
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, reconnectDelay(attempt, PUBLISH_RETRY_BASE_MS, PUBLISH_RETRY_CAP_MS))
+        )
+      }
+    }
+  }
+
+  private async publishOnce(
+    client: MqttClient,
+    topic: string,
+    message: string | Buffer,
+    options: IClientPublishOptions
+  ): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      client.publish(topic, message, options ?? {}, (error) => {
+      client.publish(topic, message, options, (error) => {
         if (error) {
           reject(error)
           return

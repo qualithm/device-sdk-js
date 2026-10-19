@@ -93,6 +93,10 @@ claimed broker has none, so it needs `broker.host` or a fresh claim.
 - **Automatic reconnect** — a dropped or refused connection retries after a random wait whose
   ceiling doubles from `reconnectPeriodMs` (1 s) up to 30 s, and resets once connected, so a fleet
   never retries in lockstep. Subscriptions are re-established on resume.
+- **Publish retry** — when the gateway can't take a QoS 1 publish, it answers with a failed PUBACK
+  and the SDK publishes the message again after a random wait, up to five attempts, before
+  `publish()` rejects. Each QoS 1 message carries a `msg-id` user property that stays the same
+  across its attempts, so the gateway stores it once. Set your own `msg-id` to choose the id.
 - **Pluggable storage** — supply your own `CredentialStore` (flash/NVS, secure element, keychain)
   for constrained or hardened targets.
 
