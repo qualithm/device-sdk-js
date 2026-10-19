@@ -12,12 +12,12 @@ vi.mock("mqtt", () => ({ connect: vi.fn() }))
 
 class FakeMqttClient extends EventEmitter {
   options: { reconnectPeriod?: number } = {}
-  publishCalls: { topic: string; message: unknown }[] = []
+  publishCalls: { topic: string; message: unknown; opts?: unknown }[] = []
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false
   forced = false
-  publish(topic: string, message: unknown, _opts: unknown, cb: (error?: Error) => void): void {
-    this.publishCalls.push({ topic, message })
+  publish(topic: string, message: unknown, opts: unknown, cb: (error?: Error) => void): void {
+    this.publishCalls.push({ topic, message, opts })
     cb()
   }
   subscribe(topic: string | string[], _opts: unknown, cb: (error: Error | null) => void): void {
@@ -105,6 +105,79 @@ describe("Device connect (token)", () => {
     expect(device.connectionState).toBe("connected")
     expect(device.identity?.token).toBe("qmd_secret")
     expect(vi.mocked(connect).mock.calls[0]?.[0]).toMatchObject({ password: "qmd_secret" })
+  })
+
+  describe("failed PUBACK", () => {
+    /** An mqtt.js PUBACK error carrying `code`. */
+    const pubackError = (code: number): Error => Object.assign(new Error("Publish error"), { code })
+    const msgIdOf = (opts: unknown): unknown =>
+      (opts as { properties?: { userProperties?: Record<string, unknown> } }).properties
+        ?.userProperties?.["msg-id"]
+
+    beforeEach(() => {
+      // Floor every backoff wait so the retries run fast.
+      vi.spyOn(Math, "random").mockReturnValue(0)
+    })
+
+    it("re-publishes a QoS 1 message with the same msg-id until the gateway takes it", async () => {
+      const codes = [0x83, 0x80]
+      const calls: unknown[] = []
+      client.publish = (_t, _m, opts, cb): void => {
+        calls.push(opts)
+        const code = codes.shift()
+        cb(code === undefined ? undefined : pubackError(code))
+      }
+
+      await device.publish("telemetry", "hi", { qos: 1 })
+
+      expect(calls).toHaveLength(3)
+      const id = msgIdOf(calls[0])
+      expect(typeof id).toBe("string")
+      expect(calls.map(msgIdOf)).toEqual([id, id, id])
+    })
+
+    it("gives each QoS 1 message its own msg-id and keeps one the caller set", async () => {
+      await device.publish("telemetry", "a", { qos: 1 })
+      await device.publish("telemetry", "b", { qos: 1 })
+      await device.publish("telemetry", "c", {
+        qos: 1,
+        properties: { userProperties: { "msg-id": "mine", other: "x" } }
+      })
+      const ids = client.publishCalls.map((c) => msgIdOf(c.opts))
+      expect(ids[0]).not.toBe(ids[1])
+      expect(ids[2]).toBe("mine")
+    })
+
+    it("adds no msg-id to a QoS 0 publish", async () => {
+      await device.publish("telemetry", "hi")
+      expect(msgIdOf(client.publishCalls[0]?.opts)).toBeUndefined()
+    })
+
+    it("rejects with the last failed PUBACK after the last attempt", async () => {
+      let calls = 0
+      client.publish = (_t, _m, _o, cb): void => {
+        calls++
+        cb(pubackError(0x83))
+      }
+
+      await expect(device.publish("telemetry", "hi", { qos: 1 })).rejects.toMatchObject({
+        code: 0x83
+      })
+      expect(calls).toBe(5)
+    })
+
+    it("does not retry an error that is not a failed PUBACK", async () => {
+      let calls = 0
+      client.publish = (_t, _m, _o, cb): void => {
+        calls++
+        cb(pubackError(0x10))
+      }
+
+      await expect(device.publish("telemetry", "hi", { qos: 1 })).rejects.toMatchObject({
+        code: 0x10
+      })
+      expect(calls).toBe(1)
+    })
   })
 
   it("publishes and subscribes", async () => {
