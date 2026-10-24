@@ -1,7 +1,7 @@
 /**
  * Certificate enrollment: upgrade a token-authenticated device to an mTLS
  * `cert` credential by generating a CSR and submitting it to the device-facing
- * provisioning endpoint (`POST /provision/credentials/cert`).
+ * provisioning endpoint (`POST /v1/provision/credentials/cert`).
  *
  * The device authenticates the same way it does for MQTT — its id as the
  * username, its existing token as the password — but presented as HTTP Basic
@@ -65,7 +65,7 @@ export const enrollDeviceCertificate = async (
   }
 
   const keyMaterial = await generateDeviceCsr(credential.deviceId)
-  const url = `${trimTrailingSlash(provisioningUrl)}/provision/credentials/cert`
+  const url = `${trimTrailingSlash(provisioningUrl)}/v1/provision/credentials/cert`
   const authorization = `Basic ${btoa(`${credential.deviceId}:${credential.token}`)}`
 
   let response: Response
