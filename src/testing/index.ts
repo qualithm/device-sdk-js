@@ -83,7 +83,7 @@ export function createRecordingCredentialStore(): RecordingCredentialStore {
  */
 export function createTestCredential(overrides: Partial<DeviceCredential> = {}): DeviceCredential {
   return {
-    deviceId: "11111111-1111-1111-1111-111111111111",
+    deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
     teamId: "team-1",
     spaceId: "space-1",
     kind: "token",
