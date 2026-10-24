@@ -41,7 +41,7 @@ describe("enrollDeviceCertificate", () => {
     expect(credential.privateKeyPem).toContain("BEGIN PRIVATE KEY")
 
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe("https://api.example.com/provision/credentials/cert")
+    expect(url).toBe("https://api.example.com/v1/provision/credentials/cert")
     const headers = init.headers as Record<string, string>
     expect(headers.authorization).toBe(`Basic ${btoa(`${tokenCredential.deviceId}:qmd_secret`)}`)
     const body = JSON.parse(init.body as string) as { csrPem: string }

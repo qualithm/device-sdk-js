@@ -1,7 +1,7 @@
 /**
  * Claim-code exchange against the Qualithm provisioning endpoint.
  *
- * A device presents its single-use claim code to `POST /provision/claim`; the
+ * A device presents its single-use claim code to `POST /v1/provision/claim`; the
  * platform mints a per-device token credential and returns the device identity.
  * The result is shaped into a {@link DeviceCredential} ready for persistence.
  */
@@ -77,7 +77,7 @@ export const claimDevice = async (
   provisioningUrl: string,
   request: ClaimRequest
 ): Promise<DeviceCredential> => {
-  const url = `${trimTrailingSlash(provisioningUrl)}/provision/claim`
+  const url = `${trimTrailingSlash(provisioningUrl)}/v1/provision/claim`
 
   let response: Response
   try {
