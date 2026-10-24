@@ -26,7 +26,7 @@ export type CredentialKind = "token" | "cert"
  * for the certificate path the key/cert/chain fields are set instead.
  */
 export type DeviceCredential = {
-  /** The device's stable identity (a UUID), used as the MQTT client id. */
+  /** The device's stable ID, used as the MQTT client id. Treat it as an opaque string. */
   deviceId: string
   /** The owning team (tenant boundary). */
   teamId: string
