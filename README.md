@@ -61,9 +61,9 @@ The platform stores readings published to the `telemetry` topic as `{ ts, metric
 reading time in epoch milliseconds, and `metrics` maps each metric name to a number. Other topics
 reach the gateway but aren't stored as readings.
 
-On first boot the SDK exchanges the claim code at `POST /provision/claim` and persists the returned
-credential. On every subsequent boot it loads the stored credential and skips claiming — claim codes
-are single-use, so a power cycle never re-claims.
+On first boot the SDK exchanges the claim code at `POST /v1/provision/claim` and persists the
+returned credential. On every subsequent boot it loads the stored credential and skips claiming —
+claim codes are single-use, so a power cycle never re-claims.
 
 ### Environments and the gateway
 
