@@ -11,7 +11,7 @@ const jsonResponse = (body: unknown, status = 200): Response =>
   })
 
 const tokenCredential: DeviceCredential = {
-  deviceId: "11111111-1111-1111-1111-111111111111",
+  deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
   teamId: "t",
   spaceId: "s",
   kind: "token",
