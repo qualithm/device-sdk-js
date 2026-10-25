@@ -79,7 +79,7 @@ export type ProvisioningInfo = {
 
 /** Identity returned to the companion app after a successful claim. */
 export type ProvisionedIdentity = {
-  /** The device's stable identity (a UUID). */
+  /** The device's stable ID, an opaque string. */
   deviceId: string
   /** The owning team (tenant boundary). */
   teamId: string
