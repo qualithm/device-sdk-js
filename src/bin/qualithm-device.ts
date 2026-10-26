@@ -16,8 +16,9 @@ import { parseArgs } from "node:util"
 import { claimCommand, connectCommand, provisionCommand } from "../cli/commands.js"
 import { printError, printResult } from "../cli/output.js"
 import { Device } from "../device.js"
-import { QualithmDeviceError } from "../errors.js"
+import { CapabilityError, QualithmDeviceError } from "../errors.js"
 import { createFileCredentialStore } from "../store.js"
+import type { DeviceOptions } from "../types.js"
 
 const DEFAULT_STORE_PATH = ".qualithm/credential.json"
 
@@ -106,11 +107,30 @@ async function waitForSigint(): Promise<void> {
   })
 }
 
+/**
+ * Read `--capabilities` as a JSON array of declarations, e.g.
+ * `[{"key":"temp","type":"sensor","metric":"temperature"}]`. The Device constructor
+ * validates each entry and rejects an empty list.
+ */
+function parseCapabilities(raw: string): DeviceOptions["capabilities"] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new CapabilityError("--capabilities must be a JSON array of capability declarations")
+  }
+  if (!Array.isArray(parsed)) {
+    throw new CapabilityError("--capabilities must be a JSON array of capability declarations")
+  }
+  return parsed as DeviceOptions["capabilities"]
+}
+
 async function runConnect(argv: string[]): Promise<void> {
   const { values } = parseArgs({
     args: argv,
     options: {
       ca: { type: "string" },
+      capabilities: { type: "string" },
       host: { type: "string" },
       insecure: { type: "boolean" },
       json: { type: "boolean" },
@@ -133,8 +153,13 @@ async function runConnect(argv: string[]): Promise<void> {
   const store = createFileCredentialStore(values.store ?? DEFAULT_STORE_PATH)
   const ca = await readCa(values.ca)
 
+  const capabilities = parseCapabilities(
+    requireValue(values.capabilities ?? process.env.QUALITHM_CAPABILITIES, "--capabilities")
+  )
+
   const device = new Device({
     provisioningUrl,
+    capabilities,
     broker: {
       ...(host !== undefined && host !== "" && { host }),
       ...(values.port !== undefined && { port: Number(values.port) }),

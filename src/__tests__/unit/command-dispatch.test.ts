@@ -48,6 +48,7 @@ const newDevice = async (
   options: Partial<DeviceOptions> = {}
 ): Promise<{ device: Device; client: FakeMqttClient }> => {
   const device = new Device({
+    capabilities: [{ key: "power", type: "onoff" }],
     provisioningUrl: "https://api.example.com",
     broker: { host: "gw.example.com" },
     store: await seededStore(tokenCredential),
@@ -95,9 +96,19 @@ describe("capability manifest", () => {
     expect(client.publishCalls.filter((call) => call.topic === "capabilities")).toHaveLength(2)
   })
 
-  it("publishes nothing on connect when no capabilities are declared", async () => {
-    const { client } = await newDevice()
-    expect(client.publishCalls).toHaveLength(0)
+  it("refuses a device that declares no capabilities", async () => {
+    const store = await seededStore(tokenCredential)
+    for (const capabilities of [undefined, []]) {
+      expect(
+        () =>
+          new Device({
+            provisioningUrl: "https://api.example.com",
+            broker: { host: "gw.example.com" },
+            store,
+            capabilities
+          } as unknown as DeviceOptions)
+      ).toThrow(CapabilityError)
+    }
   })
 
   it("rejects an invalid declaration at construction and at declaration time", async () => {
@@ -121,7 +132,8 @@ describe("capability manifest", () => {
   it("publishes immediately when declareCapabilities is called on a live session", async () => {
     const { device, client } = await newDevice()
     await device.declareCapabilities([{ key: "power", type: "onoff" }])
-    expect(client.publishCalls.map((call) => call.topic)).toEqual(["capabilities"])
+    // One manifest on connect, then the re-declaration at once.
+    expect(client.publishCalls.map((call) => call.topic)).toEqual(["capabilities", "capabilities"])
   })
 })
 
@@ -129,6 +141,7 @@ describe("command dispatch", () => {
   it("subscribes command/# once handlers are registered, exactly once", async () => {
     const store = await seededStore(tokenCredential)
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       store

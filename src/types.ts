@@ -113,10 +113,12 @@ export type DeviceOptions = {
   store?: CredentialStore
   /**
    * Capabilities the device declares to the platform, published as a manifest
-   * on every connect (Decision qualithm/pm#747). Invalid declarations throw a
-   * `CapabilityError` from the constructor.
+   * on every connect (Decision qualithm/pm#747). Required, with at least one
+   * entry: a device that declares nothing sends data no dashboard or automation
+   * can use. A missing, empty or invalid list throws a `CapabilityError` from
+   * the constructor.
    */
-  capabilities?: CapabilityDeclaration[]
+  capabilities: [CapabilityDeclaration, ...CapabilityDeclaration[]]
   /**
    * Reconnect backoff base in milliseconds. Defaults to `1000`. Each
    * consecutive failure doubles the ceiling of a random wait, up to 30 s; a

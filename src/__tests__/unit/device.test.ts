@@ -13,11 +13,17 @@ vi.mock("mqtt", () => ({ connect: vi.fn() }))
 class FakeMqttClient extends EventEmitter {
   options: { reconnectPeriod?: number } = {}
   publishCalls: { topic: string; message: unknown; opts?: unknown }[] = []
+  /** Manifests the device publishes on connect, kept apart from application messages. */
+  manifestCalls: { topic: string; message: unknown }[] = []
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false
   forced = false
   publish(topic: string, message: unknown, opts: unknown, cb: (error?: Error) => void): void {
-    this.publishCalls.push({ topic, message, opts })
+    if (topic === "capabilities") {
+      this.manifestCalls.push({ topic, message })
+    } else {
+      this.publishCalls.push({ topic, message, opts })
+    }
     cb()
   }
   subscribe(topic: string | string[], _opts: unknown, cb: (error: Error | null) => void): void {
@@ -48,6 +54,7 @@ const seededStore = async (credential: DeviceCredential): Promise<CredentialStor
 
 const newDevice = (store: CredentialStore): Device =>
   new Device({
+    capabilities: [{ key: "power", type: "onoff" }],
     provisioningUrl: "https://api.example.com",
     broker: { host: "gw.example.com" },
     store
@@ -190,9 +197,10 @@ describe("Device connect (token)", () => {
   it("rejects an oversize publish before it reaches the wire (qualithm/pm#126)", async () => {
     const limited = newDevice(await seededStore(tokenCredential))
     const limitedClient = new FakeMqttClient()
-    await connectWithLimit(limited, limitedClient, 8)
+    // The limit leaves room for the connect-time manifest, which the guard also measures.
+    await connectWithLimit(limited, limitedClient, 64)
 
-    await expect(limited.publish("telemetry", "012345678")).rejects.toBeInstanceOf(
+    await expect(limited.publish("telemetry", "x".repeat(65))).rejects.toBeInstanceOf(
       PayloadTooLargeError
     )
     // Nothing was sent — the guard fired before the bytes went out.
@@ -202,9 +210,9 @@ describe("Device connect (token)", () => {
   it("publishes a payload at the ceiling and one under it", async () => {
     const limited = newDevice(await seededStore(tokenCredential))
     const limitedClient = new FakeMqttClient()
-    await connectWithLimit(limited, limitedClient, 8)
+    await connectWithLimit(limited, limitedClient, 64)
 
-    await limited.publish("telemetry", "12345678")
+    await limited.publish("telemetry", "x".repeat(64))
     expect(limitedClient.publishCalls).toHaveLength(1)
   })
 
@@ -336,6 +344,7 @@ describe("Device errors", () => {
 
   it("applies broker overrides and propagates publish/subscribe errors", async () => {
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com", port: 9000, ca: "CA", rejectUnauthorized: false },
       keepaliveSeconds: 30,
@@ -365,6 +374,7 @@ describe("Device errors", () => {
   it("backs reconnects off exponentially and resets once connected", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.999999)
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       reconnectPeriodMs: 500,
@@ -393,6 +403,7 @@ describe("Device errors", () => {
 
   it("leaves reconnecting disabled when the base is zero", async () => {
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       reconnectPeriodMs: 0,
@@ -416,6 +427,7 @@ describe("Device errors", () => {
       )
     )
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       claimCode: "qmc_x.y",
@@ -542,6 +554,7 @@ describe("Device with a claimed broker", () => {
     )
     const store = createMemoryCredentialStore()
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.test.qualithm.com",
       claimCode: "qmc_x.y",
       store
@@ -562,6 +575,7 @@ describe("Device with a claimed broker", () => {
 
   it("fails to connect when a stored credential predates the broker and none is configured", async () => {
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       store: await seededStore(tokenCredential)
     })
