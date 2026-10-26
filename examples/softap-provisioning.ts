@@ -22,6 +22,7 @@ async function main(): Promise<void> {
   console.log("=== Soft-AP Provisioning ===\n")
 
   const device = new Device({
+    capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }],
     provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com"
   })
 

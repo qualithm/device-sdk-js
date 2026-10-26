@@ -24,6 +24,7 @@ const sampleSerialized = JSON.stringify(sampleCredential)
 const deviceOptions: DeviceOptions = {
   provisioningUrl: "https://api.qualithm.com",
   broker: { host: "gw.example.qualithm.com" },
+  capabilities: [{ key: "power", type: "onoff" }],
   store: createMemoryCredentialStore()
 }
 
