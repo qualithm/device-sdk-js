@@ -22,6 +22,7 @@ async function main(): Promise<void> {
   const gateway = process.env.QUALITHM_GATEWAY
 
   const device = new Device({
+    capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }],
     provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com",
     ...(gateway !== undefined && { broker: { host: gateway } }),
     ...(claimCode !== undefined && { claimCode })

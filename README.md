@@ -45,7 +45,8 @@ import { Device } from "@qualithm/device"
 
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
-  claimCode: process.env.QUALITHM_CLAIM_CODE
+  claimCode: process.env.QUALITHM_CLAIM_CODE,
+  capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }]
 })
 
 device.onState((state) => console.log("state:", state))
@@ -115,9 +116,10 @@ const { privateKeyPem, csrPem } = await generateDeviceCsr(deviceId)
 
 ### Commands & capabilities
 
-A device declares what it can do; the platform validates every command against that declaration
-before sending it. Declare capabilities once — the manifest is published on every connect — and
-register a handler per commandable key:
+Every device declares what it can do, with at least one capability: `new Device` throws a
+`CapabilityError` without one. Dashboards and automations read the declaration, and the platform
+validates every command against it before sending it. The manifest is published on every connect.
+Register a handler per commandable key:
 
 ```ts
 import { Device } from "@qualithm/device"
@@ -157,7 +159,8 @@ import { createNmcliAccessPoint, Device } from "@qualithm/device"
 
 const device = new Device({
   provisioningUrl: "https://api.qualithm.com",
-  name: "field-gateway"
+  name: "field-gateway",
+  capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }]
 })
 
 await device.startProvisioning({

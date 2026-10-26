@@ -163,9 +163,14 @@ export class Device {
   constructor(options: DeviceOptions) {
     this.options = options
     this.store = options.store ?? createFileCredentialStore(DEFAULT_STORE_PATH)
-    if (options.capabilities !== undefined) {
-      this.setCapabilities(options.capabilities)
+    // The type requires a non-empty list; JavaScript callers get the same rule at runtime.
+    const declared = options.capabilities as CapabilityDeclaration[] | undefined
+    if (declared === undefined || declared.length === 0) {
+      throw new CapabilityError(
+        "a device must declare at least one capability at connect (Decision qualithm/pm#747)"
+      )
     }
+    this.setCapabilities(declared)
   }
 
   /** The current connection state. */
