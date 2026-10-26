@@ -17,7 +17,10 @@ class FakeMqttClient extends EventEmitter {
   subscribeCalls: { topic: string | string[] }[] = []
   ended = false
   publish(topic: string, message: unknown, _opts: unknown, cb: (error?: Error) => void): void {
-    this.publishCalls.push({ topic, message })
+    // The connect-time capability manifest isn't one of the command's messages.
+    if (topic !== "capabilities") {
+      this.publishCalls.push({ topic, message })
+    }
     cb()
   }
   subscribe(topic: string | string[], _opts: unknown, cb: (error: Error | null) => void): void {
@@ -106,6 +109,7 @@ describe("connectCommand", () => {
     const store = createMemoryCredentialStore()
     await store.save(tokenCredential)
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       store
@@ -130,6 +134,7 @@ describe("connectCommand", () => {
     const store = createMemoryCredentialStore()
     await store.save(tokenCredential)
     const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
       provisioningUrl: "https://api.example.com",
       broker: { host: "gw.example.com" },
       store

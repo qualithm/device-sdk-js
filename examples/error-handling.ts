@@ -25,6 +25,7 @@ async function main(): Promise<void> {
   // 1. Connecting with no stored credential and no claim code → CredentialError.
   console.log("--- Missing credential ---")
   const device = new Device({
+    capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }],
     provisioningUrl: "https://api.qualithm.com",
     store: createMemoryCredentialStore()
   })
