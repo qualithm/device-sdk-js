@@ -51,7 +51,7 @@ export type {
 } from "./provision-server.js"
 export { ProvisioningServer } from "./provision-server.js"
 
-// Reference setup access point for the Pi/Node path (qualithm/pm#201)
+// Reference setup access point for a NetworkManager host (qualithm/pm#201)
 export type { HotspotCommands, NmcliAccessPointOptions, NmcliRunner } from "./access-point.js"
 export { createNmcliAccessPoint, hotspotCommands } from "./access-point.js"
 export type { KeyfileStore, NmcliHomeNetworkOptions } from "./home-network.js"
