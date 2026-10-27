@@ -1,5 +1,5 @@
 /**
- * A reference {@link HomeNetworkController} for the Pi/Node path
+ * A reference {@link HomeNetworkController} for a NetworkManager host
  * (qualithm/pm#1545): joins the home network the companion app sent with the
  * claim, through NetworkManager.
  *
@@ -111,7 +111,7 @@ const defaultStore: KeyfileStore = {
 /**
  * Create a {@link HomeNetworkController} that joins through NetworkManager.
  * Supply it as `homeNetwork` to `ProvisioningServer`/`Device.startProvisioning`
- * on a Pi-class device. Writing the keyfile needs root, as NetworkManager's
+ * on a NetworkManager host. Writing the keyfile needs root, as NetworkManager's
  * system connections directory does.
  *
  * `forget` deletes the profile and the keyfile, best-effort, so a failed
