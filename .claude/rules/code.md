@@ -8,7 +8,7 @@ auto-reconnecting MQTT-over-TLS session to the Qualithm gateway.
 
 - **Runtime-agnostic.** Use only cross-runtime APIs: global `fetch`, global `crypto`/`crypto.subtle`
   (WebCrypto), and `node:` built-ins (`node:fs/promises`, `node:path`). Do **not** use Bun-only APIs
-  (`Bun.*`) — the SDK must run on plain Node and Pi-class Linux, not just Bun.
+  (`Bun.*`) — the SDK must run on plain Node and Deno, not just Bun.
 - **Modules** (`src/`):
   - `types.ts` — public types (`DeviceCredential`, `ConnectionState`, `CredentialStore`,
     `DeviceOptions`, `BrokerOptions`).

@@ -1,11 +1,10 @@
 /**
- * A reference {@link AccessPointController} for the Pi/Node path
- * (qualithm/pm#201): brings up the device's `qualithm-setup-*` network as a
- * NetworkManager hotspot on a credential-less device and tears it down once
- * the claim lands. Raspberry Pi OS and most Linux distros manage Wi-Fi with
- * NetworkManager, so `nmcli` is the mechanism; the commands are constructed
- * pure and executed only at the boundary, so the shape is unit-testable
- * without a host radio.
+ * A reference {@link AccessPointController} for a host whose Wi-Fi
+ * NetworkManager manages (qualithm/pm#201): brings up the device's
+ * `qualithm-setup-*` network as a NetworkManager hotspot on a credential-less
+ * device and tears it down once the claim lands, through `nmcli`. The
+ * commands are constructed pure and executed only at the boundary, so the
+ * shape is unit-testable without a host radio.
  */
 
 import { execFile } from "node:child_process"
@@ -62,7 +61,7 @@ const defaultRunner: NmcliRunner = async (args) => {
 /**
  * Create an {@link AccessPointController} that drives a NetworkManager
  * hotspot via `nmcli`. Supply it as `accessPoint` to
- * `ProvisioningServer`/`Device.startProvisioning` on a Pi-class device.
+ * `ProvisioningServer`/`Device.startProvisioning` on a NetworkManager host.
  *
  * `stop` is idempotent: a device that was never asked to host (or whose
  * profile is already gone) tears down cleanly, which keeps a failed or
