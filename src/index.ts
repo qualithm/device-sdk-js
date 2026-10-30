@@ -37,7 +37,7 @@ export {
 // Stores
 export { createFileCredentialStore, createMemoryCredentialStore } from "./store.js"
 
-// Soft-AP provisioning server (Decision qualithm/pm#763)
+// Soft-AP provisioning server
 export type {
   AccessPointController,
   ClaimExchange,
@@ -68,7 +68,7 @@ export type {
   DeviceOptions
 } from "./types.js"
 
-// Capabilities & commands (Decision qualithm/pm#747)
+// Capabilities & commands
 export type {
   CapabilityDeclaration,
   CapabilityManifest,

@@ -113,9 +113,8 @@ export type DeviceOptions = {
   store?: CredentialStore
   /**
    * Capabilities the device declares to the platform, published as a manifest
-   * on every connect (Decision qualithm/pm#747). Required, with at least one
-   * entry: a device that declares nothing sends data no dashboard or automation
-   * can use. A missing, empty or invalid list throws a `CapabilityError` from
+   * on every connect. Required, with at least one entry: a device that declares
+   * nothing sends data no dashboard or automation can use. A missing, empty or invalid list throws a `CapabilityError` from
    * the constructor.
    */
   capabilities: [CapabilityDeclaration, ...CapabilityDeclaration[]]
