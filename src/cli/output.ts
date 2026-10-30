@@ -21,7 +21,7 @@ function causeText(cause: unknown): string {
 
 /**
  * Join an error's message with the messages of its `cause` chain, e.g.
- * `Failed to connect to the gateway: unable to get local issuer certificate`.
+ * `could not connect to the gateway: unable to get local issuer certificate`.
  */
 export function describeError(error: unknown): string {
   const parts = [error instanceof Error ? error.message : String(error)]

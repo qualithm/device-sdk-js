@@ -118,7 +118,7 @@ export const resolveBroker = (
     return { host: credential.broker.host, port: configured?.port ?? credential.broker.port }
   }
   throw new ConnectionError(
-    "No broker host is configured and the stored credential has none from enrollment"
+    "no broker host is configured and the stored credential names none: set broker.host"
   )
 }
 
@@ -166,7 +166,7 @@ export class Device {
     // The type requires a non-empty list; JavaScript callers get the same rule at runtime.
     const declared = options.capabilities as CapabilityDeclaration[] | undefined
     if (declared === undefined || declared.length === 0) {
-      throw new CapabilityError("a device must declare at least one capability at connect")
+      throw new CapabilityError("no capabilities declared: declare at least one in capabilities")
     }
     this.setCapabilities(declared)
   }
@@ -210,10 +210,12 @@ export class Device {
    */
   onCommand<V>(key: string, handler: CommandHandler<V>): () => void {
     if (!isValidCapabilityKey(key)) {
-      throw new CapabilityError(`Invalid capability key: ${key}`)
+      throw new CapabilityError(
+        `capability key ${key} is not valid: use 1 to 64 letters, digits, "_" or "-", starting with a letter or digit`
+      )
     }
     if (this.declaredCapabilities.get(key)?.type === "sensor") {
-      throw new CapabilityError(`Capability ${key} is read-only`)
+      throw new CapabilityError(`capability ${key} is a read-only sensor and takes no commands`)
     }
     this.commandHandlers.set(key, handler as CommandHandler)
     void this.ensureCommandSubscription().catch((error: unknown) => {
@@ -254,7 +256,9 @@ export class Device {
     options?: Omit<ProvisioningServerOptions, "provisioningUrl" | "store">
   ): Promise<ProvisioningServer> {
     if (this.state !== "idle" && this.state !== "provisioning") {
-      throw new ConnectionError("Cannot start provisioning while a gateway session is active")
+      throw new ConnectionError(
+        "cannot start provisioning while a gateway session is active: call disconnect() first"
+      )
     }
     const server = new ProvisioningServer({
       ...options,
@@ -309,7 +313,7 @@ export class Device {
     const max = this.maxEventBytes
     if (max !== null && message.length > max) {
       throw new PayloadTooLargeError(
-        `Event payload of ${String(message.length)} bytes exceeds the gateway's ${String(max)}-byte limit`,
+        `event payload of ${String(message.length)} bytes exceeds the gateway's ${String(max)}-byte limit`,
         { maxBytes: max, actualBytes: message.length }
       )
     }
@@ -386,7 +390,9 @@ export class Device {
 
     const { claimCode } = this.options
     if (claimCode === undefined || claimCode === "") {
-      throw new CredentialError("No stored credential and no claim code provided")
+      throw new CredentialError(
+        "no stored credential and no claim code: set claimCode to claim the device"
+      )
     }
 
     this.setState("provisioning")
@@ -438,13 +444,15 @@ export class Device {
 
     if (credential.kind === "cert") {
       if (credential.privateKeyPem === undefined || credential.certificatePem === undefined) {
-        throw new CredentialError("Certificate credential is missing key or certificate material")
+        throw new CredentialError(
+          "stored certificate credential is missing its private key or certificate"
+        )
       }
       return { ...base, key: credential.privateKeyPem, cert: credential.certificatePem }
     }
 
     if (credential.token === undefined || credential.token === "") {
-      throw new CredentialError("Token credential is missing its secret")
+      throw new CredentialError("stored token credential is missing its secret")
     }
     return { ...base, username: credential.deviceId, password: credential.token }
   }
@@ -565,7 +573,7 @@ export class Device {
       }
       const onError = (error: Error): void => {
         client.removeListener("connect", onConnect)
-        reject(new ConnectionError("Failed to connect to the gateway", { cause: error }))
+        reject(new ConnectionError("could not connect to the gateway", { cause: error }))
       }
       client.once("connect", onConnect)
       client.once("error", onError)
@@ -574,7 +582,7 @@ export class Device {
 
   private requireClient(): MqttClient {
     if (this.client === null) {
-      throw new ConnectionError("Device is not connected")
+      throw new ConnectionError("device is not connected: call connect() first")
     }
     return this.client
   }

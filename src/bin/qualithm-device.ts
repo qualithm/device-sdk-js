@@ -24,7 +24,9 @@ const DEFAULT_STORE_PATH = ".qualithm/credential.json"
 
 function requireValue(value: string | undefined, flag: string): string {
   if (value === undefined || value === "") {
-    throw new QualithmDeviceError(`${flag} is required (flag or matching env var)`)
+    throw new QualithmDeviceError(
+      `${flag} is required: pass it or set the matching environment variable`
+    )
   }
   return value
 }
@@ -117,10 +119,14 @@ function parseCapabilities(raw: string): DeviceOptions["capabilities"] {
   try {
     parsed = JSON.parse(raw)
   } catch {
-    throw new CapabilityError("--capabilities must be a JSON array of capability declarations")
+    throw new CapabilityError(
+      "--capabilities is not valid: pass a JSON array of capability declarations"
+    )
   }
   if (!Array.isArray(parsed)) {
-    throw new CapabilityError("--capabilities must be a JSON array of capability declarations")
+    throw new CapabilityError(
+      "--capabilities is not valid: pass a JSON array of capability declarations"
+    )
   }
   return parsed as DeviceOptions["capabilities"]
 }
@@ -222,7 +228,7 @@ async function main(): Promise<void> {
     return
   }
   throw new QualithmDeviceError(
-    `Unknown command "${command ?? ""}" — expected claim, provision, or connect`
+    `unknown command "${command ?? ""}": use claim, provision or connect`
   )
 }
 
