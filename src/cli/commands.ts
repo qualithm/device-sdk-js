@@ -46,7 +46,7 @@ export async function provisionCommand(
 ): Promise<DeviceCredential> {
   const existing = await options.store.load()
   if (existing === null) {
-    throw new CredentialError("No stored credential — run `claim` first")
+    throw new CredentialError("no stored credential: run `claim` first")
   }
 
   const credential = await enrollDeviceCertificate(options.provisioningUrl, existing, {
@@ -98,7 +98,7 @@ export async function connectCommand(options: ConnectCommandOptions): Promise<Co
 
   const { identity } = options.device
   if (identity === null) {
-    throw new CredentialError("Device connected but has no identity")
+    throw new CredentialError("device connected but has no identity")
   }
 
   return { identity, subscribed: subscribeTopics, published: options.publish ?? null }

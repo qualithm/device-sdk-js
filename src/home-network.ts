@@ -65,12 +65,12 @@ const escapeValue = (value: string): string =>
 export const homeNetworkKeyfile = (network: HomeNetwork, ifname = "wlan0"): string => {
   const ssid = new TextEncoder().encode(network.ssid)
   if (ssid.length === 0 || ssid.length > 32) {
-    throw new ProvisioningError("The home network name must be 1 to 32 bytes")
+    throw new ProvisioningError("home network name is empty or longer than 32 bytes")
   }
   const open = network.passphrase === ""
   if (!open && !PSK_PRINTABLE.test(network.passphrase) && !PSK_HEX.test(network.passphrase)) {
     throw new ProvisioningError(
-      "The home network passphrase must be 8 to 63 characters, or 64 hex digits"
+      "home network passphrase is not valid: use 8 to 63 printable characters, or 64 hex digits"
     )
   }
 
