@@ -87,13 +87,16 @@ export const claimDevice = async (
       body: JSON.stringify(request)
     })
   } catch (error) {
-    throw new ClaimError("Failed to reach the provisioning endpoint", { cause: error })
+    throw new ClaimError(
+      "could not reach the provisioning endpoint: check the network connection and provisioningUrl",
+      { cause: error }
+    )
   }
 
   const envelope = (await safeJson(response)) as ClaimEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message = envelope?.message ?? `Claim failed with status ${String(response.status)}`
+    const message = envelope?.message ?? `claim failed with HTTP status ${String(response.status)}`
     throw new ClaimError(message, { status: response.status })
   }
 

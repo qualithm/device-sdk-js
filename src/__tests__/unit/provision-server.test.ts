@@ -208,7 +208,9 @@ describe("POST /provision/claim", () => {
     const exchange = vi.fn(async () => {
       attempt += 1
       if (attempt === 1) {
-        return Promise.reject(new ClaimError("Claim code expired", { status: 401 }))
+        return Promise.reject(
+          new ClaimError("claim code expired: add the device again for a new code", { status: 401 })
+        )
       }
       return Promise.resolve(credential)
     })
@@ -220,7 +222,7 @@ describe("POST /provision/claim", () => {
     })
     expect(failed.status).toBe(401)
     expect((await failed.json()) as { message: string }).toEqual({
-      message: "Claim code expired"
+      message: "claim code expired: add the device again for a new code"
     })
     expect(server.state).toBe("serving")
     expect(await store.load()).toBeNull()
@@ -258,7 +260,7 @@ describe("POST /provision/claim", () => {
     })
     expect(response.status).toBe(502)
     expect((await response.json()) as { message: string }).toEqual({
-      message: "The provisioning endpoint failed"
+      message: "provisioning endpoint failed"
     })
     await server.stop()
   })
@@ -383,7 +385,9 @@ describe("ProvisioningServer home network onboarding", () => {
     const order: string[] = []
     const homeNetwork = homeNetworkFake(order)
     const exchange = async (): Promise<DeviceCredential> =>
-      Promise.reject(new ClaimError("Claim code expired", { status: 401 }))
+      Promise.reject(
+        new ClaimError("claim code expired: add the device again for a new code", { status: 401 })
+      )
     const { server, store, url } = await startServer({ homeNetwork, exchange })
 
     await fetch(`${url}/provision/claim`, {
@@ -455,9 +459,9 @@ describe("ProvisioningServer home network onboarding", () => {
 
     await waitFor(() => errors.length >= 3)
     expect(errors.map((error) => error.message)).toEqual([
-      "Onboarding failed; bringing the setup access point back",
+      "onboarding failed: restarting the setup access point",
       "forget failed",
-      "Failed to start the setup access point"
+      "could not start the setup access point"
     ])
     expect(server.state).toBe("idle")
   })

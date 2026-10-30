@@ -295,7 +295,9 @@ describe("Device errors", () => {
     expect(client.forced).toBe(true)
     expect(device.connectionState).toBe("idle")
     // No lingering client: the handle reports not connected.
-    await expect(device.publish("t", "x")).rejects.toThrow("Device is not connected")
+    await expect(device.publish("t", "x")).rejects.toThrow(
+      "device is not connected: call connect() first"
+    )
   })
 
   it("can retry connect after a failed first connect", async () => {
