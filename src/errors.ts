@@ -126,7 +126,7 @@ export class CapabilityError extends QualithmDeviceError {
   }
 }
 
-/** Failure of the soft-AP provisioning server lifecycle (Decision qualithm/pm#763). */
+/** Failure of the soft-AP provisioning server lifecycle. */
 export class ProvisioningError extends QualithmDeviceError {
   /** Discriminant tag — always `"ProvisioningError"`. */
   override readonly tag = PROVISIONING_ERROR_TAG

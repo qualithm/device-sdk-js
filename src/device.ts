@@ -166,9 +166,7 @@ export class Device {
     // The type requires a non-empty list; JavaScript callers get the same rule at runtime.
     const declared = options.capabilities as CapabilityDeclaration[] | undefined
     if (declared === undefined || declared.length === 0) {
-      throw new CapabilityError(
-        "a device must declare at least one capability at connect (Decision qualithm/pm#747)"
-      )
+      throw new CapabilityError("a device must declare at least one capability at connect")
     }
     this.setCapabilities(declared)
   }
@@ -205,8 +203,8 @@ export class Device {
    * Register a handler for commands addressed to one capability key.
    *
    * The SDK subscribes `command/#` once and dispatches by key, decoding the
-   * Decision qualithm/pm#747 payload first: a settable capability's handler receives the
-   * decoded value; a `trigger` capability's handler is invoked with no value.
+   * payload first: a settable capability's handler receives the decoded value;
+   * a `trigger` capability's handler is invoked with no value.
    * A malformed payload or a throwing handler is reported through `onError`
    * without interrupting dispatch. Returns an unregister function.
    */
@@ -238,8 +236,8 @@ export class Device {
   }
 
   /**
-   * Start soft-AP provisioning mode (Decision qualithm/pm#763): serve the claim exchange
-   * on the device's setup network until the companion app claims the device.
+   * Start soft-AP provisioning mode: serve the claim exchange on the device's
+   * setup network until the companion app claims the device.
    *
    * Only available before a gateway session exists — never alongside one. A
    * successful claim persists the credential, stops the server and the setup

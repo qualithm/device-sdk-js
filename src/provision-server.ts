@@ -1,6 +1,6 @@
 /**
  * Soft-AP provisioning server: the device-side endpoint the companion app
- * talks to on the device's setup network (Decision qualithm/pm#763).
+ * talks to on the device's setup network.
  *
  * When the device has no credential, the server advertises itself at
  * `GET /provision/info` and accepts the claim exchange at
@@ -11,9 +11,8 @@
  * failed claim leaves the server running, so onboarding can restart cleanly.
  *
  * When the claim also carries home Wi-Fi details, the device answers first,
- * then drops the access point, joins the home network and claims from there
- * (Decision qualithm/pm#763, qualithm/pm#1497 amendment), so a single-radio
- * device has a route to the platform. A failed join or claim forgets the
+ * then drops the access point, joins the home network and claims from there,
+ * so a single-radio device has a route to the platform. A failed join or claim forgets the
  * network and brings the access point back.
  */
 
