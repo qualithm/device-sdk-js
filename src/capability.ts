@@ -123,7 +123,9 @@ export function isValidCapabilityKey(key: string): boolean {
 
 function requireValidKey(key: string): void {
   if (!isValidCapabilityKey(key)) {
-    throw new CapabilityError(`Invalid capability key: ${key}`)
+    throw new CapabilityError(
+      `capability key ${key} is not valid: use 1 to 64 letters, digits, "_" or "-", starting with a letter or digit`
+    )
   }
 }
 
@@ -135,13 +137,15 @@ function buildConfig(declaration: CapabilityDeclaration): Record<string, JsonVal
     case "range": {
       const { key, min, max, step, unit } = declaration
       if (!Number.isFinite(min) || !Number.isFinite(max)) {
-        throw new CapabilityError(`Range capability ${key} requires finite min and max`)
+        throw new CapabilityError(`range capability ${key} needs finite min and max values`)
       }
       if (min >= max) {
-        throw new CapabilityError(`Range capability ${key} requires min < max`)
+        throw new CapabilityError(`range capability ${key} needs min lower than max`)
       }
       if (step !== undefined && (!Number.isFinite(step) || step <= 0)) {
-        throw new CapabilityError(`Range capability ${key} step must be a positive number`)
+        throw new CapabilityError(
+          `range capability ${key} has an invalid step: use a positive number`
+        )
       }
       return {
         min,
@@ -154,7 +158,7 @@ function buildConfig(declaration: CapabilityDeclaration): Record<string, JsonVal
       const { key, options } = declaration
       if (options.length === 0 || options.some((option) => option === "")) {
         throw new CapabilityError(
-          `Enum capability ${key} requires at least one non-empty string option`
+          `enum capability ${key} has no options or an empty one: give at least one non-empty string option`
         )
       }
       return { options: [...options] }
@@ -162,7 +166,7 @@ function buildConfig(declaration: CapabilityDeclaration): Record<string, JsonVal
     case "sensor": {
       const { key, metric, unit } = declaration
       if (metric === "") {
-        throw new CapabilityError(`Sensor capability ${key} requires a metric name`)
+        throw new CapabilityError(`sensor capability ${key} has no metric name: set metric`)
       }
       return { metric, ...(unit !== undefined && { unit }) }
     }
@@ -180,7 +184,9 @@ export function buildManifest(declarations: CapabilityDeclaration[]): Capability
   for (const declaration of declarations) {
     requireValidKey(declaration.key)
     if (seen.has(declaration.key)) {
-      throw new CapabilityError(`Duplicate capability key: ${declaration.key}`)
+      throw new CapabilityError(
+        `capability key ${declaration.key} is declared twice: give each capability its own key`
+      )
     }
     seen.add(declaration.key)
     capabilities.push({
@@ -201,10 +207,10 @@ export function decodeCommandPayload(data: Uint8Array): CommandPayload {
   try {
     json = JSON.parse(textDecoder.decode(data))
   } catch {
-    throw new CommandError("Command payload is not valid JSON")
+    throw new CommandError("command payload is not valid JSON")
   }
   if (typeof json !== "object" || json === null || Array.isArray(json)) {
-    throw new CommandError("Command payload must be a JSON object")
+    throw new CommandError("command payload is not a JSON object")
   }
   const keys = Object.keys(json)
   if (keys.length === 0) {
@@ -213,7 +219,7 @@ export function decodeCommandPayload(data: Uint8Array): CommandPayload {
   if (keys.length === 1 && keys[0] === "value") {
     return { kind: "value", value: (json as { value: JsonValue }).value }
   }
-  throw new CommandError('Command payload must be {"value": ...} or {}')
+  throw new CommandError('command payload is neither {"value": ...} nor {}')
 }
 
 /**
@@ -229,14 +235,14 @@ export function validateCommandValue(
   switch (declaration.type) {
     case "trigger":
       if (payload.kind !== "trigger") {
-        throw new CommandError(`Capability ${key} takes no value`)
+        throw new CommandError(`capability ${key} is a trigger and takes no value`)
       }
       return
     case "sensor":
-      throw new CommandError(`Capability ${key} is read-only`)
+      throw new CommandError(`capability ${key} is a read-only sensor`)
     case "onoff":
       if (payload.kind !== "value" || typeof payload.value !== "boolean") {
-        throw new CommandError(`Capability ${key} requires a boolean value`)
+        throw new CommandError(`capability ${key} needs a boolean value`)
       }
       return
     case "range":
@@ -245,11 +251,11 @@ export function validateCommandValue(
         typeof payload.value !== "number" ||
         !Number.isFinite(payload.value)
       ) {
-        throw new CommandError(`Capability ${key} requires a numeric value`)
+        throw new CommandError(`capability ${key} needs a numeric value`)
       }
       if (payload.value < declaration.min || payload.value > declaration.max) {
         throw new CommandError(
-          `Capability ${key} value is outside ${String(declaration.min)}..${String(declaration.max)}`
+          `capability ${key} value is outside ${String(declaration.min)}..${String(declaration.max)}`
         )
       }
       return
@@ -259,7 +265,7 @@ export function validateCommandValue(
         typeof payload.value !== "string" ||
         !declaration.options.includes(payload.value)
       ) {
-        throw new CommandError(`Capability ${key} requires one of its declared options`)
+        throw new CommandError(`capability ${key} needs one of its declared options`)
       }
       return
   }

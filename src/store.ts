@@ -31,7 +31,7 @@ export const createFileCredentialStore = (path: string): CredentialStore => ({
       if (isNotFound(error)) {
         return null
       }
-      throw new CredentialError(`Failed to read credential at ${path}`, { cause: error })
+      throw new CredentialError(`could not read the credential at ${path}`, { cause: error })
     }
   },
 

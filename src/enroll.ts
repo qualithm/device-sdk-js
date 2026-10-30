@@ -61,7 +61,9 @@ export const enrollDeviceCertificate = async (
   request?: EnrollRequest
 ): Promise<DeviceCredential> => {
   if (credential.token === undefined || credential.token === "") {
-    throw new EnrollError("A token credential is required to enroll for a certificate")
+    throw new EnrollError(
+      "certificate enrollment needs a token credential: pass the credential returned by claim"
+    )
   }
 
   const keyMaterial = await generateDeviceCsr(credential.deviceId)
@@ -76,13 +78,18 @@ export const enrollDeviceCertificate = async (
       body: JSON.stringify({ csrPem: keyMaterial.csrPem, ...request })
     })
   } catch (error) {
-    throw new EnrollError("Failed to reach the provisioning endpoint", { cause: error })
+    throw new EnrollError(
+      "could not reach the provisioning endpoint: check the network connection and provisioningUrl",
+      { cause: error }
+    )
   }
 
   const envelope = (await safeJson(response)) as EnrollEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message = envelope?.message ?? `Enrollment failed with status ${String(response.status)}`
+    const message =
+      envelope?.message ??
+      `certificate enrollment failed with HTTP status ${String(response.status)}`
     throw new EnrollError(message, { status: response.status })
   }
 

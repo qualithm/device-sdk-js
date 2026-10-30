@@ -142,7 +142,7 @@ const readBody = async (req: IncomingMessage): Promise<Buffer> => {
     const part = chunk as Buffer
     size += part.length
     if (size > MAX_BODY_BYTES) {
-      throw new ProvisioningError("Request body too large")
+      throw new ProvisioningError("request body is larger than 16 KiB")
     }
     chunks.push(part)
   }
@@ -236,19 +236,19 @@ export class ProvisioningServer {
    */
   async start(): Promise<{ host: string; port: number }> {
     if (this.serverState === "serving") {
-      throw new ProvisioningError("The provisioning server is already running")
+      throw new ProvisioningError("provisioning server is already running")
     }
     if (this.serverState === "provisioned") {
-      throw new ProvisioningError("The device is already provisioned")
+      throw new ProvisioningError("device is already provisioned")
     }
     if ((await this.options.store.load()) !== null) {
-      throw new ProvisioningError("The device is already provisioned")
+      throw new ProvisioningError("device is already provisioned")
     }
 
     try {
       await this.options.accessPoint?.start()
     } catch (error) {
-      throw new ProvisioningError("Failed to start the setup access point", { cause: error })
+      throw new ProvisioningError("could not start the setup access point", { cause: error })
     }
     this.accessPointStarted = this.options.accessPoint !== undefined
 
@@ -264,7 +264,7 @@ export class ProvisioningServer {
       })
     } catch (error) {
       await this.stopAccessPoint()
-      throw new ProvisioningError("Failed to start the provisioning server", { cause: error })
+      throw new ProvisioningError("could not start the provisioning server", { cause: error })
     }
     this.server = server
     this.serverState = "serving"
@@ -293,7 +293,7 @@ export class ProvisioningServer {
     try {
       if (path === INFO_PATH) {
         if (req.method !== "GET") {
-          sendJson(res, 405, { message: "Method not allowed" })
+          sendJson(res, 405, { message: "method not allowed: use GET" })
           return
         }
         const info: ProvisioningInfo = { status: "awaiting-claim" }
@@ -305,16 +305,16 @@ export class ProvisioningServer {
       }
       if (path === CLAIM_PATH) {
         if (req.method !== "POST") {
-          sendJson(res, 405, { message: "Method not allowed" })
+          sendJson(res, 405, { message: "method not allowed: use POST" })
           return
         }
         await this.handleClaim(req, res)
         return
       }
-      sendJson(res, 404, { message: "Not found" })
+      sendJson(res, 404, { message: "no such endpoint" })
     } catch (error) {
       if (!res.headersSent) {
-        sendJson(res, 500, { message: "Internal error" })
+        sendJson(res, 500, { message: "device failed to handle the request" })
       }
       this.reportError(asError(error))
     }
@@ -322,7 +322,7 @@ export class ProvisioningServer {
 
   private async handleClaim(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (this.serverState === "provisioned" || this.serverState === "onboarding") {
-      sendJson(res, 409, { message: "The device is already provisioned" })
+      sendJson(res, 409, { message: "device is already provisioned" })
       return
     }
 
@@ -330,13 +330,14 @@ export class ProvisioningServer {
     try {
       raw = await readBody(req)
     } catch {
-      sendJson(res, 413, { message: "Request body too large" })
+      sendJson(res, 413, { message: "request body is larger than 16 KiB" })
       return
     }
     const parsed = parseClaimRequest(raw)
     if (parsed === null) {
       sendJson(res, 400, {
-        message: "Expected a JSON body with a claim code, and both ssid and passphrase or neither"
+        message:
+          "request body is not valid: send JSON with a code, and both ssid and passphrase or neither"
       })
       return
     }
@@ -345,7 +346,7 @@ export class ProvisioningServer {
     if (network !== undefined) {
       const { homeNetwork } = this.options
       if (homeNetwork === undefined) {
-        sendJson(res, 501, { message: "This device can't join a home network" })
+        sendJson(res, 501, { message: "this device cannot join a home network" })
         return
       }
       this.serverState = "onboarding"
@@ -365,14 +366,14 @@ export class ProvisioningServer {
         sendJson(res, error.status ?? 502, { message: error.message })
         return
       }
-      sendJson(res, 502, { message: "The provisioning endpoint failed" })
+      sendJson(res, 502, { message: "provisioning endpoint failed" })
       return
     }
 
     try {
       await this.options.store.save(credential)
     } catch (error) {
-      sendJson(res, 500, { message: "Claimed the device but failed to persist the credential" })
+      sendJson(res, 500, { message: "device claimed but its credential could not be saved" })
       this.reportError(asError(error))
       return
     }
@@ -439,7 +440,7 @@ export class ProvisioningServer {
     cause: unknown
   ): Promise<void> {
     this.reportError(
-      new ProvisioningError("Onboarding failed; bringing the setup access point back", { cause })
+      new ProvisioningError("onboarding failed: restarting the setup access point", { cause })
     )
     try {
       await homeNetwork.forget()
