@@ -98,7 +98,7 @@ export const enrollDeviceCertificate = async (
   return {
     deviceId: credential.deviceId,
     teamId: credential.teamId,
-    spaceId: credential.spaceId,
+    scopeId: credential.scopeId,
     kind: "cert",
     privateKeyPem: keyMaterial.privateKeyPem,
     certificatePem: data.certificatePem,

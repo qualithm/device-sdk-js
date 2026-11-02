@@ -33,7 +33,7 @@ async function main(): Promise<void> {
     const credential: DeviceCredential = {
       deviceId: "11111111-1111-1111-1111-111111111111",
       teamId: "team-1",
-      spaceId: "space-1",
+      scopeId: "scope-1",
       kind: "token",
       token: "qmd_persisted",
       issuedAt: new Date().toISOString()

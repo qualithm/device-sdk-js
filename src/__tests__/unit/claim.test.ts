@@ -18,7 +18,7 @@ describe("claimDevice", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({
         success: true,
-        data: { deviceId: "d", spaceId: "s", teamId: "t", secret: "qmd_abc" }
+        data: { deviceId: "d", scopeId: "s", teamId: "t", secret: "qmd_abc" }
       })
     )
 
@@ -34,7 +34,7 @@ describe("claimDevice", () => {
       jsonResponse({
         data: {
           deviceId: "d",
-          spaceId: "s",
+          scopeId: "s",
           teamId: "t",
           secret: "qmd_abc",
           broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 }
@@ -49,7 +49,7 @@ describe("claimDevice", () => {
 
   it("leaves the broker unset when an older platform omits it", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ data: { deviceId: "d", spaceId: "s", teamId: "t", secret: "qmd_abc" } })
+      jsonResponse({ data: { deviceId: "d", scopeId: "s", teamId: "t", secret: "qmd_abc" } })
     )
 
     const credential = await claimDevice("https://api.example.com", { code: "qmc_x.y" })
