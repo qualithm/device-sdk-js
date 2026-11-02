@@ -40,7 +40,7 @@ class FakeMqttClient extends EventEmitter {
 const tokenCredential: DeviceCredential = {
   deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
   teamId: "t",
-  spaceId: "s",
+  scopeId: "s",
   kind: "token",
   token: "qmd_secret",
   issuedAt: "2026-01-01T00:00:00.000Z"
@@ -423,7 +423,7 @@ describe("Device errors", () => {
       new Response(
         JSON.stringify({
           success: true,
-          data: { deviceId: "d", spaceId: "s", teamId: "t", secret: "qmd_n" }
+          data: { deviceId: "d", scopeId: "s", teamId: "t", secret: "qmd_n" }
         }),
         { status: 200, headers: { "content-type": "application/json" } }
       )
@@ -545,7 +545,7 @@ describe("Device with a claimed broker", () => {
         JSON.stringify({
           data: {
             deviceId: "d",
-            spaceId: "s",
+            scopeId: "s",
             teamId: "t",
             secret: "qmd_n",
             broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 }

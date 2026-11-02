@@ -19,7 +19,7 @@ export type ClaimRequest = {
 
 type ClaimData = {
   deviceId: string
-  spaceId: string
+  scopeId: string
   teamId: string
   secret: string
   broker?: unknown
@@ -104,7 +104,7 @@ export const claimDevice = async (
   return {
     deviceId: data.deviceId,
     teamId: data.teamId,
-    spaceId: data.spaceId,
+    scopeId: data.scopeId,
     kind: data.credential?.kind ?? "token",
     token: data.secret,
     issuedAt: new Date().toISOString(),

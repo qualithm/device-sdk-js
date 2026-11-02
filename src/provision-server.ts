@@ -82,8 +82,8 @@ export type ProvisionedIdentity = {
   deviceId: string
   /** The owning team (tenant boundary). */
   teamId: string
-  /** The space the device belongs to. */
-  spaceId: string
+  /** The scope the device belongs to. */
+  scopeId: string
 }
 
 /**
@@ -382,7 +382,7 @@ export class ProvisioningServer {
     const identity: ProvisionedIdentity = {
       deviceId: credential.deviceId,
       teamId: credential.teamId,
-      spaceId: credential.spaceId
+      scopeId: credential.scopeId
     }
     res.writeHead(200, { "content-type": "application/json", connection: "close" })
     res.end(JSON.stringify(identity), () => {

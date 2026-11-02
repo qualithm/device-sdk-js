@@ -10,7 +10,7 @@ import type { DeviceCredential } from "../../types.js"
 const sample: DeviceCredential = {
   deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
   teamId: "t",
-  spaceId: "s",
+  scopeId: "s",
   kind: "token",
   token: "qmd_secret",
   issuedAt: new Date().toISOString()

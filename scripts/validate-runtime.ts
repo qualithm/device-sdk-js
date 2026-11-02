@@ -35,7 +35,7 @@ try {
   const credential = {
     deviceId: "11111111-1111-1111-1111-111111111111",
     teamId: "t",
-    spaceId: "s",
+    scopeId: "s",
     kind: "token",
     token: "qmd_smoke",
     issuedAt: new Date().toISOString()

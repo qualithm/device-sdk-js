@@ -30,8 +30,8 @@ export type DeviceCredential = {
   deviceId: string
   /** The owning team (tenant boundary). */
   teamId: string
-  /** The space the device belongs to. */
-  spaceId: string
+  /** The scope the device belongs to. */
+  scopeId: string
   /** Which authentication mechanism this credential uses. */
   kind: CredentialKind
   /** Bearer secret for the token path; presented as the MQTT password. */
