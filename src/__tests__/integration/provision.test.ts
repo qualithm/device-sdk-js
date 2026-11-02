@@ -18,7 +18,7 @@ describe("provisioning integration", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({
         success: true,
-        data: { deviceId: "d", spaceId: "s", teamId: "t", secret: "qmd_x" }
+        data: { deviceId: "d", scopeId: "s", teamId: "t", secret: "qmd_x" }
       })
     )
     const store = createMemoryCredentialStore()
