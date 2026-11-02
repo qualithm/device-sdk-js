@@ -13,7 +13,7 @@ const jsonResponse = (body: unknown, status = 200): Response =>
 const tokenCredential: DeviceCredential = {
   deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
   teamId: "t",
-  spaceId: "s",
+  scopeId: "s",
   kind: "token",
   token: "qmd_secret",
   issuedAt: "2026-01-01T00:00:00.000Z"

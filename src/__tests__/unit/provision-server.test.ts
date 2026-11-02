@@ -14,7 +14,7 @@ import type { CredentialStore, DeviceCredential } from "../../types.js"
 const credential: DeviceCredential = {
   deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
   teamId: "t",
-  spaceId: "s",
+  scopeId: "s",
   kind: "token",
   token: "qmd_secret",
   issuedAt: new Date().toISOString()
@@ -165,7 +165,7 @@ describe("POST /provision/claim", () => {
 
     expect(response.status).toBe(200)
     const identity = (await response.json()) as Record<string, unknown>
-    expect(identity).toEqual({ deviceId: credential.deviceId, teamId: "t", spaceId: "s" })
+    expect(identity).toEqual({ deviceId: credential.deviceId, teamId: "t", scopeId: "s" })
     expect(identity.token).toBeUndefined()
 
     const handedOff = await provisioned

@@ -85,7 +85,7 @@ export function createTestCredential(overrides: Partial<DeviceCredential> = {}):
   return {
     deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
     teamId: "team-1",
-    spaceId: "space-1",
+    scopeId: "scope-1",
     kind: "token",
     token: "qmd_testsecret",
     issuedAt: "2026-01-01T00:00:00.000Z",
