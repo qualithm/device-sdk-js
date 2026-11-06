@@ -16,6 +16,7 @@ export { generateDeviceCsr } from "./csr.js"
 // Certificate enrollment
 export type { EnrollRequest } from "./enroll.js"
 export { enrollDeviceCertificate } from "./enroll.js"
+export { renewCredential } from "./renew.js"
 
 // Device
 export type { CommandHandler, ErrorListener, MessageListener, StateListener } from "./device.js"
@@ -31,7 +32,8 @@ export {
   EnrollError,
   PayloadTooLargeError,
   ProvisioningError,
-  QualithmDeviceError
+  QualithmDeviceError,
+  RenewalError
 } from "./errors.js"
 
 // Stores
