@@ -98,6 +98,10 @@ claimed broker has none, so it needs `broker.host` or a fresh claim.
   and the SDK publishes the message again after a random wait, up to five attempts, before
   `publish()` rejects. Each QoS 1 message carries a `msg-id` user property that stays the same
   across its attempts, so the gateway stores it once. Set your own `msg-id` to choose the id.
+- **Credential renewal** — a credential that expires is renewed two thirds of the way through its
+  lifetime and stored before it's used, so a device that keeps running never needs claiming again. A
+  failed renewal keeps the old credential and retries. A device that was off past its credential's
+  expiry refuses to connect with a `CredentialError` that says to claim it again.
 - **Pluggable storage** — supply your own `CredentialStore` (flash/NVS, secure element, keychain)
   for constrained or hardened targets.
 
