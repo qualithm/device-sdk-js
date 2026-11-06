@@ -33,7 +33,8 @@ export {
   PayloadTooLargeError,
   ProvisioningError,
   QualithmDeviceError,
-  RenewalError
+  RenewalError,
+  TopicError
 } from "./errors.js"
 
 // Stores
