@@ -31,7 +31,8 @@ import {
   ConnectionError,
   CredentialError,
   PayloadTooLargeError,
-  RenewalError
+  RenewalError,
+  TopicError
 } from "./errors.js"
 import { ProvisioningServer, type ProvisioningServerOptions } from "./provision-server.js"
 import { assertNotExpired, renewalTime, renewCredential } from "./renew.js"
@@ -53,6 +54,7 @@ const MQTT_PROTOCOL_VERSION = 5
 const COMMAND_TOPIC_PREFIX = "command/"
 const COMMAND_TOPIC_FILTER = "command/#"
 const MANIFEST_TOPIC = "capabilities"
+const TELEMETRY_TOPIC = "telemetry"
 /** Publishes of one message, including the first, before a failed PUBACK is final. */
 const PUBLISH_ATTEMPTS = 5
 /** The ceiling of the first wait before re-publishing, in milliseconds. */
@@ -67,6 +69,27 @@ const RENEW_RETRY_CAP_MS = 3_600_000
 const MAX_TIMER_MS = 2_147_483_647
 /** User property naming one message across its re-publishes, for gateway dedup. */
 const MSG_ID_PROPERTY = "msg-id"
+
+/**
+ * Refuse a topic the gateway doesn't accept a publish on: anything but
+ * `telemetry`, `capabilities` or a `command/<key>` response.
+ *
+ * @throws {@link TopicError} for any other topic
+ */
+export const assertContractTopic = (topic: string): void => {
+  if (topic === TELEMETRY_TOPIC || topic === MANIFEST_TOPIC) {
+    return
+  }
+  if (
+    topic.startsWith(COMMAND_TOPIC_PREFIX) &&
+    isValidCapabilityKey(topic.slice(COMMAND_TOPIC_PREFIX.length))
+  ) {
+    return
+  }
+  throw new TopicError(
+    `the gateway accepts no publish on ${topic}: publish readings to telemetry, or a command response to command/<key>`
+  )
+}
 
 /** True when `error` is a PUBACK whose reason code says the gateway did not take the message. */
 const isFailedPuback = (error: Error): boolean =>
@@ -309,13 +332,16 @@ export class Device {
   }
 
   /**
-   * Publish a payload to a (device-relative) topic.
+   * Publish a payload to a (device-relative) topic: `telemetry` for
+   * readings, or `command/<key>` for a command response. The gateway accepts
+   * no other topic.
    *
    * A QoS 1 publish carries a `msg-id` user property. When the gateway answers
    * it with a failed PUBACK (reason code 0x80 or above), it is published again
    * with the same `msg-id`, after a capped, jittered backoff, so the gateway
    * stores it once.
    *
+   * @throws {@link TopicError} for a topic the gateway doesn't accept.
    * @throws {@link PayloadTooLargeError} when the payload exceeds the ceiling
    * the gateway advertised in CONNACK (qualithm/pm#126) — caught before the bytes
    * go on the wire, so the device is told rather than silently dropped.
@@ -326,6 +352,7 @@ export class Device {
     payload: string | Uint8Array,
     options?: IClientPublishOptions
   ): Promise<void> {
+    assertContractTopic(topic)
     const client = this.requireClient()
     const message = toMessage(payload)
     const max = this.maxEventBytes

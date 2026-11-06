@@ -3,8 +3,8 @@ import { EventEmitter } from "node:events"
 import { connect, type MqttClient } from "mqtt"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { Device, resolveBroker } from "../../device.js"
-import { ConnectionError, CredentialError, PayloadTooLargeError } from "../../errors.js"
+import { assertContractTopic, Device, resolveBroker } from "../../device.js"
+import { ConnectionError, CredentialError, PayloadTooLargeError, TopicError } from "../../errors.js"
 import { createMemoryCredentialStore } from "../../store.js"
 import type { CredentialStore, DeviceCredential } from "../../types.js"
 
@@ -82,6 +82,37 @@ const connectWithLimit = async (
 
 afterEach(() => {
   vi.clearAllMocks()
+})
+
+describe("contract topics", () => {
+  it("accepts telemetry, capabilities and command responses", () => {
+    for (const topic of ["telemetry", "capabilities", "command/power", "command/fan-1"]) {
+      expect(() => {
+        assertContractTopic(topic)
+      }).not.toThrow()
+    }
+  })
+
+  it("refuses any other topic with where to publish instead", () => {
+    for (const topic of ["telemetry/temperature", "status", "command/", "command/a/b", "t"]) {
+      expect(() => {
+        assertContractTopic(topic)
+      }).toThrow(TopicError)
+    }
+    expect(() => {
+      assertContractTopic("status")
+    }).toThrow(
+      "the gateway accepts no publish on status: publish readings to telemetry, or a command response to command/<key>"
+    )
+  })
+
+  it("refuses an off-contract publish before it reaches the gateway", async () => {
+    const device = newDevice(await seededStore(tokenCredential))
+    const client = new FakeMqttClient()
+    await connectWith(device, client)
+    await expect(device.publish("status", "x")).rejects.toBeInstanceOf(TopicError)
+    expect(client.publishCalls).toEqual([])
+  })
 })
 
 describe("Device construction", () => {
@@ -260,7 +291,7 @@ describe("Device events", () => {
 describe("Device errors", () => {
   it("rejects publish/subscribe before connect", async () => {
     const device = newDevice(createMemoryCredentialStore())
-    await expect(device.publish("t", "x")).rejects.toBeInstanceOf(ConnectionError)
+    await expect(device.publish("telemetry", "x")).rejects.toBeInstanceOf(ConnectionError)
     await expect(device.subscribe("t")).rejects.toBeInstanceOf(ConnectionError)
   })
 
@@ -295,7 +326,7 @@ describe("Device errors", () => {
     expect(client.forced).toBe(true)
     expect(device.connectionState).toBe("idle")
     // No lingering client: the handle reports not connected.
-    await expect(device.publish("t", "x")).rejects.toThrow(
+    await expect(device.publish("telemetry", "x")).rejects.toThrow(
       "device is not connected: call connect() first"
     )
   })
@@ -369,7 +400,7 @@ describe("Device errors", () => {
     client.subscribe = (_t, _o, cb): void => {
       cb(new Error("sub"))
     }
-    await expect(device.publish("t", new Uint8Array([1]))).rejects.toThrow("pub")
+    await expect(device.publish("telemetry", new Uint8Array([1]))).rejects.toThrow("pub")
     await expect(device.subscribe(["t"])).rejects.toThrow("sub")
   })
 
