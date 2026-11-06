@@ -30,9 +30,11 @@ import {
   CapabilityError,
   ConnectionError,
   CredentialError,
-  PayloadTooLargeError
+  PayloadTooLargeError,
+  RenewalError
 } from "./errors.js"
 import { ProvisioningServer, type ProvisioningServerOptions } from "./provision-server.js"
+import { assertNotExpired, renewalTime, renewCredential } from "./renew.js"
 import { createFileCredentialStore } from "./store.js"
 import type {
   BrokerEndpoint,
@@ -57,6 +59,12 @@ const PUBLISH_ATTEMPTS = 5
 const PUBLISH_RETRY_BASE_MS = 500
 /** The largest wait before re-publishing, in milliseconds. */
 const PUBLISH_RETRY_CAP_MS = 10_000
+/** The ceiling of the first wait before retrying a failed renewal, in milliseconds. */
+const RENEW_RETRY_BASE_MS = 60_000
+/** The largest wait before retrying a failed renewal, in milliseconds. */
+const RENEW_RETRY_CAP_MS = 3_600_000
+/** The longest delay `setTimeout` accepts; a later renewal is re-armed when it fires. */
+const MAX_TIMER_MS = 2_147_483_647
 /** User property naming one message across its re-publishes, for gateway dedup. */
 const MSG_ID_PROPERTY = "msg-id"
 
@@ -78,6 +86,9 @@ const withMsgId = (options: IClientPublishOptions): IClientPublishOptions => {
     }
   }
 }
+
+/** How one renewal attempt ended. */
+type Renewal = { ok: true; credential: DeviceCredential } | { ok: false; error: Error }
 
 /** Listener notified on every connection-state transition. */
 export type StateListener = (state: ConnectionState) => void
@@ -159,6 +170,8 @@ export class Device {
    * limit, so an unadvertised connection is never blocked client-side.
    */
   private maxEventBytes: number | null = null
+  private renewTimer: ReturnType<typeof setTimeout> | null = null
+  private renewFailures = 0
 
   constructor(options: DeviceOptions) {
     this.options = options
@@ -285,9 +298,14 @@ export class Device {
    * auto-reconnecting MQTT-over-TLS session. Resolves once connected.
    */
   async connect(): Promise<void> {
-    const credential = await this.provision()
+    const stored = await this.provision()
+    assertNotExpired(stored)
+    const due = renewalTime(stored)
+    const renewal = due !== undefined && due <= Date.now() ? await this.renew(stored) : undefined
+    const credential = renewal?.ok === true ? renewal.credential : stored
     this.credential = credential
     await this.openConnection(credential)
+    this.scheduleRenewal()
   }
 
   /**
@@ -367,6 +385,7 @@ export class Device {
   /** Gracefully close the session. The state becomes `closed` (terminal). */
   async disconnect(): Promise<void> {
     this.setState("closed")
+    this.clearRenewal()
     const { client } = this
     if (client === null) {
       return
@@ -402,6 +421,88 @@ export class Device {
     })
     await this.store.save(claimed)
     return claimed
+  }
+
+  /**
+   * Renew `credential` and store the new one, then switch to it. The old one
+   * stays in use, and stored, until the new one is saved. A failure is
+   * reported through `onError` and retried later.
+   *
+   * @returns the new credential, or the error when renewal failed
+   */
+  private async renew(credential: DeviceCredential): Promise<Renewal> {
+    let renewed: DeviceCredential
+    try {
+      renewed = await renewCredential(this.options.provisioningUrl, credential)
+      await this.store.save(renewed)
+    } catch (error) {
+      this.renewFailures += 1
+      const failure = asError(error)
+      this.emitError(failure)
+      return { ok: false, error: failure }
+    }
+    this.renewFailures = 0
+    this.credential = renewed
+    const { client } = this
+    if (client !== null) {
+      // The next reconnect presents the new credential.
+      Object.assign(client.options, this.credentialOptions(renewed))
+    }
+    return { ok: true, credential: renewed }
+  }
+
+  /** Arm the timer for the next renewal of the current credential, or a retry after a failure. */
+  private scheduleRenewal(lastError?: Error): void {
+    this.clearRenewal()
+    const { credential } = this
+    if (credential === null || this.state === "closed") {
+      return
+    }
+    if (RenewalError.isError(lastError) && !lastError.retryable) {
+      return
+    }
+    const due = renewalTime(credential)
+    if (due === undefined) {
+      return
+    }
+    const wait =
+      this.renewFailures > 0
+        ? reconnectDelay(this.renewFailures, RENEW_RETRY_BASE_MS, RENEW_RETRY_CAP_MS)
+        : due - Date.now()
+    const timer = setTimeout(
+      () => {
+        void this.onRenewalTimer()
+      },
+      Math.min(MAX_TIMER_MS, Math.max(0, wait))
+    )
+    // A pending renewal never keeps the process alive.
+    if (typeof timer === "object" && "unref" in timer) {
+      timer.unref()
+    }
+    this.renewTimer = timer
+  }
+
+  private async onRenewalTimer(): Promise<void> {
+    this.renewTimer = null
+    const { credential } = this
+    if (credential === null || this.state === "closed") {
+      return
+    }
+    const due = renewalTime(credential)
+    if (due !== undefined && due > Date.now() && this.renewFailures === 0) {
+      // A timer capped below a far-off renewal re-arms instead.
+      this.scheduleRenewal()
+      return
+    }
+    const renewal = await this.renew(credential)
+    this.scheduleRenewal(renewal.ok ? undefined : renewal.error)
+  }
+
+  private clearRenewal(): void {
+    if (this.renewTimer !== null) {
+      clearTimeout(this.renewTimer)
+      this.renewTimer = null
+    }
   }
 
   private async openConnection(credential: DeviceCredential): Promise<void> {
@@ -442,19 +543,24 @@ export class Device {
       })
     }
 
+    return { ...base, ...this.credentialOptions(credential) }
+  }
+
+  /** The client options that present `credential` to the gateway. */
+  private credentialOptions(credential: DeviceCredential): IClientOptions {
     if (credential.kind === "cert") {
       if (credential.privateKeyPem === undefined || credential.certificatePem === undefined) {
         throw new CredentialError(
           "stored certificate credential is missing its private key or certificate"
         )
       }
-      return { ...base, key: credential.privateKeyPem, cert: credential.certificatePem }
+      return { key: credential.privateKeyPem, cert: credential.certificatePem }
     }
 
     if (credential.token === undefined || credential.token === "") {
       throw new CredentialError("stored token credential is missing its secret")
     }
-    return { ...base, username: credential.deviceId, password: credential.token }
+    return { username: credential.deviceId, password: credential.token }
   }
 
   private bindClientEvents(client: MqttClient): void {
