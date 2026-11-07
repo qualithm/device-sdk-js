@@ -96,7 +96,7 @@ export const claimDevice = async (
   const envelope = (await safeJson(response)) as ClaimEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message = envelope?.message ?? `claim failed with HTTP status ${String(response.status)}`
+    const message = envelope?.message ?? `claim failed with status ${String(response.status)}`
     throw new ClaimError(message, { status: response.status })
   }
 
