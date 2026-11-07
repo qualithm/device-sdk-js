@@ -151,7 +151,7 @@ describe("renewCredential (token)", () => {
     await expect(renewCredential("https://api.example.com", token)).rejects.toMatchObject({
       status: 429,
       retryable: true,
-      message: "credential renewal failed with HTTP status 429"
+      message: "renewal failed with status 429"
     })
   })
 

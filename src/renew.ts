@@ -129,8 +129,7 @@ const post = async (
   const envelope = (await safeJson(response)) as RenewEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message =
-      envelope?.message ?? `credential renewal failed with HTTP status ${String(response.status)}`
+    const message = envelope?.message ?? `renewal failed with status ${String(response.status)}`
     throw new RenewalError(message, { status: response.status })
   }
   return data
@@ -179,12 +178,15 @@ export const renewCredential = async (
       throw new RenewalError("the renewal response carries no certificate")
     }
     const broker = parseBroker(data.broker) ?? credential.broker
+    const { expiresAt: _previousExpiry, ...current } = credential
+    const certExpiresAt = data.credential?.expiresAt
     return {
-      ...credential,
+      ...current,
       privateKeyPem: next.privateKeyPem,
       certificatePem: data.certificatePem,
       ...(data.caCertificatePem !== undefined && { caCertificatePem: data.caCertificatePem }),
       issuedAt,
+      ...(typeof certExpiresAt === "string" && { expiresAt: certExpiresAt }),
       ...(broker !== undefined && { broker })
     }
   }
