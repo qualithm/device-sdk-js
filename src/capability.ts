@@ -121,79 +121,133 @@ export function isValidCapabilityKey(key: string): boolean {
   return KEY_PATTERN.test(key)
 }
 
-function requireValidKey(key: string): void {
-  if (!isValidCapabilityKey(key)) {
-    throw new CapabilityError(
-      `capability key ${key} is not valid: use 1 to 64 letters, digits, "_" or "-", starting with a letter or digit`
-    )
-  }
+/** Each capability type, and the declaration fields it takes besides `key` and `type`. */
+const FIELDS: Record<CapabilityType, readonly string[]> = {
+  onoff: [],
+  range: ["min", "max", "step", "unit"],
+  enum: ["options"],
+  trigger: [],
+  sensor: ["metric", "unit"]
 }
 
-function buildConfig(declaration: CapabilityDeclaration): Record<string, JsonValue> {
-  switch (declaration.type) {
+const isCapabilityType = (value: unknown): value is CapabilityType =>
+  typeof value === "string" && Object.hasOwn(FIELDS, value)
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value)
+
+function optionalUnit(key: string, fields: Record<string, unknown>): { unit?: string } {
+  if (!("unit" in fields)) {
+    return {}
+  }
+  const { unit } = fields
+  if (typeof unit !== "string") {
+    throw new CapabilityError(`capability ${key} has a unit that is not a string: use a string`)
+  }
+  return { unit }
+}
+
+function buildConfig(
+  key: string,
+  type: CapabilityType,
+  fields: Record<string, unknown>
+): Record<string, JsonValue> {
+  switch (type) {
     case "onoff":
     case "trigger":
       return {}
     case "range": {
-      const { key, min, max, step, unit } = declaration
-      if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      const { min, max } = fields
+      if (!isFiniteNumber(min) || !isFiniteNumber(max)) {
         throw new CapabilityError(`range capability ${key} needs finite min and max values`)
       }
       if (min >= max) {
         throw new CapabilityError(`range capability ${key} needs min lower than max`)
       }
-      if (step !== undefined && (!Number.isFinite(step) || step <= 0)) {
-        throw new CapabilityError(
-          `range capability ${key} has an invalid step: use a positive number`
-        )
+      const config: Record<string, JsonValue> = { min, max }
+      if ("step" in fields) {
+        const { step } = fields
+        if (!isFiniteNumber(step) || step <= 0) {
+          throw new CapabilityError(
+            `range capability ${key} has an invalid step: use a positive number`
+          )
+        }
+        config.step = step
       }
-      return {
-        min,
-        max,
-        ...(step !== undefined && { step }),
-        ...(unit !== undefined && { unit })
-      }
+      return { ...config, ...optionalUnit(key, fields) }
     }
     case "enum": {
-      const { key, options } = declaration
-      if (options.length === 0 || options.some((option) => option === "")) {
+      const { options } = fields
+      if (
+        !Array.isArray(options) ||
+        options.length === 0 ||
+        !options.every((option) => typeof option === "string" && option !== "")
+      ) {
         throw new CapabilityError(
           `enum capability ${key} has no options or an empty one: give at least one non-empty string option`
         )
       }
-      return { options: [...options] }
+      return { options: [...(options as string[])] }
     }
     case "sensor": {
-      const { key, metric, unit } = declaration
-      if (metric === "") {
+      const { metric } = fields
+      if (typeof metric !== "string" || metric === "") {
         throw new CapabilityError(`sensor capability ${key} has no metric name: set metric`)
       }
-      return { metric, ...(unit !== undefined && { unit }) }
+      return { metric, ...optionalUnit(key, fields) }
     }
   }
+}
+
+function buildEntry(declaration: unknown): ManifestCapability {
+  if (typeof declaration !== "object" || declaration === null || Array.isArray(declaration)) {
+    throw new CapabilityError(
+      "a capability declaration is not an object: give each one a key and a type"
+    )
+  }
+  const fields = declaration as Record<string, unknown>
+  const { key, type } = fields
+  if (typeof key !== "string" || !isValidCapabilityKey(key)) {
+    throw new CapabilityError(
+      `capability key ${String(key)} is not valid: use 1 to 64 letters, digits, "_" or "-", starting with a letter or digit`
+    )
+  }
+  if (!isCapabilityType(type)) {
+    throw new CapabilityError(
+      `capability ${key} has an unknown type ${String(type)}: use onoff, range, enum, trigger or sensor`
+    )
+  }
+  const allowed = FIELDS[type]
+  for (const name of Object.keys(fields)) {
+    if (name !== "key" && name !== "type" && !allowed.includes(name)) {
+      throw new CapabilityError(`capability ${key} of type ${type} takes no ${name}: remove it`)
+    }
+  }
+  return { key, type, config: buildConfig(key, type, fields) }
 }
 
 /**
  * Validate declarations and build the manifest the platform's ingest worker
  * parses. Invalid declarations throw a {@link CapabilityError} here, on the
- * device, rather than being rejected silently after publish.
+ * device, rather than being rejected silently after publish. The input is
+ * checked at runtime too, for callers the types don't reach.
  */
 export function buildManifest(declarations: CapabilityDeclaration[]): CapabilityManifest {
+  const input: unknown = declarations
+  if (!Array.isArray(input) || input.length === 0) {
+    throw new CapabilityError("no capabilities declared: declare at least one")
+  }
   const seen = new Set<string>()
   const capabilities: ManifestCapability[] = []
-  for (const declaration of declarations) {
-    requireValidKey(declaration.key)
-    if (seen.has(declaration.key)) {
+  for (const declaration of input) {
+    const entry = buildEntry(declaration)
+    if (seen.has(entry.key)) {
       throw new CapabilityError(
-        `capability key ${declaration.key} is declared twice: give each capability its own key`
+        `capability key ${entry.key} is declared twice: give each capability its own key`
       )
     }
-    seen.add(declaration.key)
-    capabilities.push({
-      key: declaration.key,
-      type: declaration.type,
-      config: buildConfig(declaration)
-    })
+    seen.add(entry.key)
+    capabilities.push(entry)
   }
   return { capabilities }
 }

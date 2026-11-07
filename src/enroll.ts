@@ -87,9 +87,7 @@ export const enrollDeviceCertificate = async (
   const envelope = (await safeJson(response)) as EnrollEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message =
-      envelope?.message ??
-      `certificate enrollment failed with HTTP status ${String(response.status)}`
+    const message = envelope?.message ?? `enrollment failed with status ${String(response.status)}`
     throw new EnrollError(message, { status: response.status })
   }
 

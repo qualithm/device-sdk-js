@@ -102,7 +102,7 @@ describe("enrollDeviceCertificate", () => {
 
     await expect(
       enrollDeviceCertificate("https://api.example.com", tokenCredential)
-    ).rejects.toThrow("certificate enrollment failed with HTTP status 500")
+    ).rejects.toThrow("enrollment failed with status 500")
   })
 
   it("throws EnrollError when the endpoint is unreachable", async () => {
