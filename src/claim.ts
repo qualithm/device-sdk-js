@@ -8,6 +8,7 @@
 
 import { ClaimError } from "./errors.js"
 import type { BrokerEndpoint, CredentialKind, DeviceCredential } from "./types.js"
+import { trimTrailingSlash } from "./url.js"
 
 /** Body sent to the provisioning endpoint. */
 export type ClaimRequest = {
@@ -34,8 +35,6 @@ type ClaimEnvelope = {
   message?: string
   data?: ClaimData
 }
-
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
 
 /**
  * Read the `broker` a provisioning response carries. An older platform omits it, and a malformed
