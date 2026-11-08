@@ -1,0 +1,11 @@
+# gitleaks allowlist (qualithm/pm#402). Each entry names one file and the one
+# rule that fired on a reviewed false positive there; every other rule and
+# file is still scanned. Add an entry only for a reviewed false positive.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Placeholder device token in the benchmark"
+targetRules = ["generic-api-key"]
+paths = ['''^bench/index\.ts$''']
