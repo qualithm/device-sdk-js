@@ -8,6 +8,7 @@
 
 import { ClaimError } from "./errors.js"
 import type { BrokerEndpoint, CredentialKind, DeviceCredential } from "./types.js"
+import { trimTrailingSlash } from "./url.js"
 
 /** Body sent to the provisioning endpoint. */
 export type ClaimRequest = {
@@ -34,8 +35,6 @@ type ClaimEnvelope = {
   message?: string
   data?: ClaimData
 }
-
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
 
 /**
  * Read the `broker` a provisioning response carries. An older platform omits it, and a malformed
@@ -96,7 +95,7 @@ export const claimDevice = async (
   const envelope = (await safeJson(response)) as ClaimEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message = envelope?.message ?? `claim failed with HTTP status ${String(response.status)}`
+    const message = envelope?.message ?? `claim failed with status ${String(response.status)}`
     throw new ClaimError(message, { status: response.status })
   }
 

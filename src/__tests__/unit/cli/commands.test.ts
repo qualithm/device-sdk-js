@@ -119,15 +119,20 @@ describe("connectCommand", () => {
     vi.mocked(connect).mockReturnValue(client as unknown as MqttClient)
     const pending = connectCommand({
       device,
-      publish: { topic: "telemetry/temperature", payload: "21.4" }
+      publish: { topic: "telemetry", payload: '{"ts":1,"metrics":{"temperature":21.4}}' }
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
     client.emit("connect")
     const result = await pending
 
     expect(result.identity.deviceId).toBe(tokenCredential.deviceId)
-    expect(result.published).toEqual({ topic: "telemetry/temperature", payload: "21.4" })
-    expect(client.publishCalls).toEqual([{ topic: "telemetry/temperature", message: "21.4" }])
+    expect(result.published).toEqual({
+      topic: "telemetry",
+      payload: '{"ts":1,"metrics":{"temperature":21.4}}'
+    })
+    expect(client.publishCalls).toEqual([
+      { topic: "telemetry", message: '{"ts":1,"metrics":{"temperature":21.4}}' }
+    ])
   })
 
   it("subscribes and forwards inbound messages", async () => {

@@ -59,8 +59,9 @@ await device.publish(
 ```
 
 The platform stores readings published to the `telemetry` topic as `{ ts, metrics }`: `ts` is the
-reading time in epoch milliseconds, and `metrics` maps each metric name to a number. Other topics
-reach the gateway but aren't stored as readings.
+reading time in epoch milliseconds, and `metrics` maps each metric name to a number. The only other
+topic a device publishes on is `command/<key>`, to answer a command: `publish()` refuses any other
+topic with a `TopicError`, because the gateway rejects it.
 
 On first boot the SDK exchanges the claim code at `POST /v1/provision/claim` and persists the
 returned credential. On every subsequent boot it loads the stored credential and skips claiming —
@@ -98,6 +99,10 @@ claimed broker has none, so it needs `broker.host` or a fresh claim.
   and the SDK publishes the message again after a random wait, up to five attempts, before
   `publish()` rejects. Each QoS 1 message carries a `msg-id` user property that stays the same
   across its attempts, so the gateway stores it once. Set your own `msg-id` to choose the id.
+- **Credential renewal** — a credential that expires is renewed two thirds of the way through its
+  lifetime and stored before it's used, so a device that keeps running never needs claiming again. A
+  failed renewal keeps the old credential and retries. A device that was off past its credential's
+  expiry refuses to connect with a `CredentialError` that says to claim it again.
 - **Pluggable storage** — supply your own `CredentialStore` (flash/NVS, secure element, keychain)
   for constrained or hardened targets.
 

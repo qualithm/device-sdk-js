@@ -12,6 +12,7 @@ import { parseBroker } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { EnrollError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
+import { trimTrailingSlash } from "./url.js"
 
 /** Optional certificate parameters for {@link enrollDeviceCertificate}. */
 export type EnrollRequest = {
@@ -32,8 +33,6 @@ type EnrollEnvelope = {
   message?: string
   data?: EnrollData
 }
-
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
 
 const safeJson = async (response: Response): Promise<unknown> => {
   try {
@@ -87,9 +86,7 @@ export const enrollDeviceCertificate = async (
   const envelope = (await safeJson(response)) as EnrollEnvelope | null
   const data = envelope?.data
   if (!response.ok || data === undefined) {
-    const message =
-      envelope?.message ??
-      `certificate enrollment failed with HTTP status ${String(response.status)}`
+    const message = envelope?.message ?? `enrollment failed with status ${String(response.status)}`
     throw new EnrollError(message, { status: response.status })
   }
 

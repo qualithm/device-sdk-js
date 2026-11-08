@@ -21,6 +21,8 @@ const CAPABILITY_ERROR_TAG = "CapabilityError" as const
 const COMMAND_ERROR_TAG = "CommandError" as const
 const PROVISIONING_ERROR_TAG = "ProvisioningError" as const
 const PAYLOAD_TOO_LARGE_ERROR_TAG = "PayloadTooLargeError" as const
+const RENEWAL_ERROR_TAG = "RenewalError" as const
+const TOPIC_ERROR_TAG = "TopicError" as const
 
 /** Base error for all device SDK errors. */
 export class QualithmDeviceError extends Error {
@@ -71,6 +73,46 @@ export class CredentialError extends QualithmDeviceError {
   /** Type-narrowing check for CredentialError. */
   static override isError(value: unknown): value is CredentialError {
     return value instanceof CredentialError
+  }
+}
+
+/** A publish on a topic the gateway doesn't accept. */
+export class TopicError extends QualithmDeviceError {
+  /** Discriminant tag — always `"TopicError"`. */
+  override readonly tag = TOPIC_ERROR_TAG
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = "TopicError"
+  }
+
+  /** Type-narrowing check for TopicError. */
+  static override isError(value: unknown): value is TopicError {
+    return value instanceof TopicError
+  }
+}
+
+/** Failure renewing a credential before it expires. */
+export class RenewalError extends QualithmDeviceError {
+  /** Discriminant tag — always `"RenewalError"`. */
+  override readonly tag = RENEWAL_ERROR_TAG
+
+  /** HTTP status returned by the provisioning endpoint, if any. */
+  readonly status: number | undefined
+
+  /** False when the platform says this credential can never be renewed. */
+  readonly retryable: boolean
+
+  constructor(message: string, options?: ErrorOptions & { status?: number }) {
+    super(message, options)
+    this.name = "RenewalError"
+    this.status = options?.status
+    this.retryable = options?.status !== 409
+  }
+
+  /** Type-narrowing check for RenewalError. */
+  static override isError(value: unknown): value is RenewalError {
+    return value instanceof RenewalError
   }
 }
 
