@@ -12,6 +12,7 @@ import { parseBroker } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { CredentialError, RenewalError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
+import { trimTrailingSlash } from "./url.js"
 
 x509.cryptoProvider.set(crypto)
 
@@ -88,8 +89,6 @@ type RenewEnvelope = {
     caCertificatePem?: string
   }
 }
-
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
 
 const safeJson = async (response: Response): Promise<unknown> => {
   try {

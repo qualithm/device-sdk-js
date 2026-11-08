@@ -12,6 +12,7 @@ import { parseBroker } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { EnrollError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
+import { trimTrailingSlash } from "./url.js"
 
 /** Optional certificate parameters for {@link enrollDeviceCertificate}. */
 export type EnrollRequest = {
@@ -32,8 +33,6 @@ type EnrollEnvelope = {
   message?: string
   data?: EnrollData
 }
-
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "")
 
 const safeJson = async (response: Response): Promise<unknown> => {
   try {
