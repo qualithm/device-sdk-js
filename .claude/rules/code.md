@@ -1,45 +1,75 @@
 # Code conventions — @qualithm/device
 
 The Qualithm device SDK for JavaScript/TypeScript runtimes (Node, Bun, Deno). It hides the device
-lifecycle behind one `connect()` call: claim once, persist the credential, and maintain an
+lifecycle behind one `connect()` call: claim once, persist the credential, and keep an
 auto-reconnecting MQTT-over-TLS session to the Qualithm gateway.
+
+`bun run lint` enforces import order, type-only imports, naming and `type` over `interface`. Fix
+what it flags; this file covers what it can't.
 
 ## Architecture
 
 - **Runtime-agnostic.** Use only cross-runtime APIs: global `fetch`, global `crypto`/`crypto.subtle`
-  (WebCrypto), and `node:` built-ins (`node:fs/promises`, `node:path`). Do **not** use Bun-only APIs
-  (`Bun.*`) — the SDK must run on plain Node and Deno, not just Bun.
-- **Modules** (`src/`):
-  - `types.ts` — public types (`DeviceCredential`, `ConnectionState`, `CredentialStore`,
-    `DeviceOptions`, `BrokerOptions`).
-  - `errors.ts` — error hierarchy (`QualithmDeviceError` base + `ClaimError`, `CredentialError`,
-    `ConnectionError`), each with a `tag` and static `isError()` for `instanceof`-free narrowing.
-  - `store.ts` — `createFileCredentialStore` (crash-safe: temp file → `fsync` → atomic `rename`) and
-    `createMemoryCredentialStore`.
-  - `claim.ts` — `claimDevice()` exchanges a claim code at `POST /provision/claim` and shapes the
-    response into a `DeviceCredential`.
-  - `csr.ts` — `generateDeviceCsr()` (ECDSA P-256 key + PKCS#10 CSR via `@peculiar/x509`;
-    `import "reflect-metadata"` must come first).
-  - `device.ts` — the `Device` class: the `connect()` state machine
-    (`idle → provisioning → connecting → connected → reconnecting`), plus
-    `publish`/`subscribe`/`disconnect` and `onState`/`onMessage`/`onError`.
-  - `index.ts` — the public barrel.
-- **Transport** is the standard `mqtt` (MQTT.js) package; reconnection/backoff is delegated to it.
-  We never implement an MQTT or TLS stack.
-- **Wire contract** (must match the platform gateway): the MQTT `clientId` is the device UUID; the
+  (WebCrypto), and `node:` built-ins. Never `Bun.*`: the SDK must run on plain Node and Deno.
+- **Entry points.** `src/index.ts` is the public barrel (`.`), `src/testing/` the `./testing`
+  export, and `src/bin/` with `src/cli/` the `qualithm-device` binary. Anything a consumer imports
+  goes through one of them.
+- **`Device`** (`src/device.ts`) owns the `connect()` state machine
+  (`idle → provisioning → connecting → connected → reconnecting`) and
+  `publish`/`subscribe`/`disconnect` with the `onState`/`onMessage`/`onError` hooks. Claiming,
+  enrollment, renewal, capabilities, credential stores and provisioning each live in their own
+  module beside it.
+- **Errors** extend `QualithmDeviceError` (`src/errors.ts`), each with a `tag` and a static
+  `isError()` for `instanceof`-free narrowing. A new failure kind gets its own subclass there.
+- **Credential stores** write crash-safely: temp file, `fsync`, then atomic `rename`.
+- **Transport** is MQTT.js. The SDK never implements MQTT or TLS; it sets its own reconnect delay
+  (exponential with jitter, `src/backoff.ts`) because MQTT.js retries on a fixed period.
+- **Wire contract** (must match the platform gateway): the MQTT `clientId` is the device ID; the
   token path presents the secret as the MQTT password; the cert path connects with `key`/`cert` over
-  mTLS. Device-facing topics are relative — the gateway derives the tenant-scoped subject from the
+  mTLS. Device-facing topics are relative: the gateway derives the tenant-scoped subject from the
   verified identity.
+- `src/csr.ts` imports `reflect-metadata` before `@peculiar/x509`.
 
-## Conventions
+## Public API
 
-- `erasableSyntaxOnly` is on (`tsconfig.node.json`): no constructor parameter-properties — declare
-  fields and assign in the body.
-- ESLint is strict: explicit return types on exported functions; separate `import type`; `eqeqeq`
-  (no `!= null` — use `=== undefined`/`=== null`); `strict-boolean-expressions`;
-  `no-confusing-void-expression` (brace arrow bodies that call void functions); wrap numbers in
-  `String(...)` in templates.
-- Public API members need TSDoc (typedoc `requiredToBeDocumented`).
+- Named exports, never default exports. Export types separately (`export type { MyType }`).
+- `unknown` over `any`. Public members carry TSDoc (typedoc `requiredToBeDocumented`): parameters,
+  return value, `@throws`.
+- Error messages are lowercase, with no trailing punctuation, and carry context. Never swallow an
+  error.
+
+## TypeScript
+
+- `erasableSyntaxOnly` is on (`tsconfig.node.json`): no constructor parameter-properties; declare
+  fields and assign them in the body.
+- ESLint is strict: explicit return types on exported functions; `eqeqeq` (no `!= null`, use
+  `=== undefined` or `=== null`); `strict-boolean-expressions`; `no-confusing-void-expression`
+  (brace arrow bodies that call void functions); wrap numbers in `String(...)` in templates.
+
+## Layout
+
+- Tests use Vitest under `src/__tests__/unit/` (integration under `src/__tests__/integration/`, the
+  gateway wire-contract fixtures in `src/__tests__/wire/`), mirroring the source path. Name each
+  test after the behavior it checks.
+- `package.json` script variants use `:`, never `-`: `test:unit`, `test:integration`, `build:watch`,
+  `lint:fix`.
+
+## When code changes
+
+A behavior change carries tests that cover its new lines (`dx coverage patch` checks them after the
+coverage step). Update types, error messages and TSDoc that mention a changed shape in the same
+change, and drop a dependency nothing imports any more. `bun run validate:runtime` checks the export
+shape on Node, Bun and Deno.
+
+## Comments
+
+Implementation comments only for non-obvious logic. No architecture overviews, diagrams, feature
+lists or how-to guides in comments; they go stale.
+
+## Generated files
+
+`.github/workflows/ci.yaml` is generated from `dx/ci-templates/`; change the template and run
+`dx ci sync` from dx, never edit it here. `CI Required` and `PR Title` are required.
 
 ## Validate
 
