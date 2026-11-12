@@ -78,7 +78,8 @@ Set `provisioningUrl` to the API of the environment the claim code came from:
 
 You don't configure the MQTT gateway. The claim response names the gateway for the device's zone,
 and the SDK stores it with the credential, so every later boot connects to the same gateway.
-`GET /zones` on the same API lists each zone's gateway.
+`GET /zones` on the same API lists each zone's gateway. If a gateway answers that the device belongs
+on another one, the SDK connects there and stores it in place of the old one.
 
 To connect somewhere else, such as a local broker, set `broker.host` (and `broker.port`). A
 configured host always wins over the claimed one. A credential stored by an SDK version before the
