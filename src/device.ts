@@ -132,6 +132,58 @@ const toMessage = (payload: string | Uint8Array): string | Buffer =>
 const asError = (value: unknown): Error =>
   value instanceof Error ? value : new Error(String(value))
 
+/** CONNACK reason codes that name another gateway: `0x9C` Use another server, `0x9D` Server moved. */
+const REDIRECT_REASON_CODES: ReadonlySet<number> = new Set([0x9c, 0x9d])
+
+/** How many redirects one `connect()` follows before it gives up. */
+const MAX_REDIRECTS = 3
+
+/**
+ * Read the first gateway a CONNACK Server Reference names. The property is a space-separated list
+ * of `host[:port]` references, with an IPv6 host in brackets.
+ *
+ * @param reference - The CONNACK's Server Reference
+ * @param port - The port to use when the reference names none
+ * @returns The gateway, or undefined when the reference names none
+ */
+export const parseServerReference = (
+  reference: string,
+  port: number
+): BrokerEndpoint | undefined => {
+  const first = reference.trim().split(/\s+/)[0] ?? ""
+  const match = /^(\[[^\]]+\]|[^:[\]]+)(?::(\d{1,5}))?$/.exec(first)
+  if (match === null) {
+    return undefined
+  }
+  const host = (match.at(1) ?? "").replace(/^\[|\]$/g, "")
+  const portText = match.at(2)
+  const named = portText === undefined ? port : Number(portText)
+  if (host === "" || named < 1 || named > 65535) {
+    return undefined
+  }
+  return { host, port: named }
+}
+
+/** The gateway a refusing CONNACK sends the device to, if it names one. */
+const redirectTarget = (packet: unknown, port: number): BrokerEndpoint | undefined => {
+  if (typeof packet !== "object" || packet === null) {
+    return undefined
+  }
+  const { cmd, reasonCode, properties } = packet as {
+    cmd?: unknown
+    reasonCode?: unknown
+    properties?: { serverReference?: unknown }
+  }
+  if (cmd !== "connack" || typeof reasonCode !== "number") {
+    return undefined
+  }
+  const reference = properties?.serverReference
+  if (!REDIRECT_REASON_CODES.has(reasonCode) || typeof reference !== "string") {
+    return undefined
+  }
+  return parseServerReference(reference, port)
+}
+
 /**
  * Choose the gateway to connect to. A configured host wins; otherwise the device uses the broker
  * the platform returned at enrollment, so it needs no hardcoded host. A configured port overrides
@@ -185,6 +237,10 @@ export class Device {
   private hasConnectedOnce = false
   private client: MqttClient | null = null
   private credential: DeviceCredential | null = null
+  /** Whether a gateway has redirected this device since it started. */
+  private redirected = false
+  /** The save of the gateway the last redirect named, while one is pending. */
+  private redirectSave: Promise<void> | null = null
   private state: ConnectionState = "idle"
   /**
    * The event payload ceiling the gateway advertised in CONNACK
@@ -532,7 +588,7 @@ export class Device {
     }
   }
 
-  private async openConnection(credential: DeviceCredential): Promise<void> {
+  private async openConnection(credential: DeviceCredential, redirects = 0): Promise<void> {
     this.setState("connecting")
     const client = connect(this.buildClientOptions(credential))
     this.client = client
@@ -546,6 +602,14 @@ export class Device {
       this.client = null
       this.setState("idle")
       client.end(true)
+      const saved = this.redirectSave
+      if (saved !== null && redirects < MAX_REDIRECTS) {
+        this.redirectSave = null
+        await saved
+        await this.openConnection(this.credential ?? credential, redirects + 1)
+        return
+      }
+      this.redirectSave = null
       throw error
     }
     await this.publishManifest()
@@ -554,7 +618,11 @@ export class Device {
 
   private buildClientOptions(credential: DeviceCredential): IClientOptions {
     const { broker } = this.options
-    const endpoint = resolveBroker(broker, credential)
+    // A redirect outranks a configured host for the rest of this process.
+    const endpoint =
+      this.redirected && credential.broker !== undefined
+        ? credential.broker
+        : resolveBroker(broker, credential)
     const base: IClientOptions = {
       host: endpoint.host,
       port: endpoint.port,
@@ -592,6 +660,13 @@ export class Device {
 
   private bindClientEvents(client: MqttClient): void {
     this.bindReconnectBackoff(client)
+    client.on("packetreceive", (packet) => {
+      const port = typeof client.options.port === "number" ? client.options.port : DEFAULT_PORT
+      const target = redirectTarget(packet, port)
+      if (target !== undefined) {
+        this.followRedirect(client, target)
+      }
+    })
     client.on("connect", () => {
       this.setState("connected")
       if (this.hasConnectedOnce) {
@@ -618,6 +693,30 @@ export class Device {
     })
     client.on("error", (error) => {
       this.emitError(error)
+    })
+  }
+
+  /**
+   * Point `client` at the gateway a CONNACK named, so its next reconnect goes there, and store it
+   * with the credential so the next start does too. A failed save surfaces through `onError`; the
+   * session still follows the redirect.
+   */
+  private followRedirect(client: MqttClient, target: BrokerEndpoint): void {
+    Object.assign(client.options, {
+      host: target.host,
+      hostname: target.host,
+      servername: target.host,
+      port: target.port
+    })
+    this.redirected = true
+    const { credential } = this
+    if (credential === null) {
+      return
+    }
+    const moved: DeviceCredential = { ...credential, broker: target }
+    this.credential = moved
+    this.redirectSave = this.store.save(moved).catch((error: unknown) => {
+      this.emitError(asError(error))
     })
   }
 
