@@ -83,7 +83,7 @@ export function createRecordingCredentialStore(): RecordingCredentialStore {
  */
 export function createTestCredential(overrides: Partial<DeviceCredential> = {}): DeviceCredential {
   return {
-    deviceId: "dev_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
+    deviceId: "dvc_defraa_01JAYQ4T7Z9K3M5N8P2R6S0V1W",
     teamId: "team-1",
     scopeId: "scope-1",
     kind: "token",
