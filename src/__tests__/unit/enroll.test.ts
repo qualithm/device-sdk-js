@@ -80,6 +80,38 @@ describe("enrollDeviceCertificate", () => {
     expect(credential.broker).toEqual({ host: "gw.test-sg-sin-a.qualithm.com", port: 8883 })
   })
 
+  it("takes the API URL from the enrollment response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        data: {
+          certificatePem: "cert-pem",
+          caCertificatePem: "ca-pem",
+          apiUrl: "https://api.sg-sin-a.qualithm.com"
+        }
+      })
+    )
+
+    const credential = await enrollDeviceCertificate("https://api.example.com", {
+      ...tokenCredential,
+      apiUrl: "https://api.old.qualithm.com"
+    })
+
+    expect(credential.apiUrl).toBe("https://api.sg-sin-a.qualithm.com")
+  })
+
+  it("keeps the claimed API URL when the enrollment response has none", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+    )
+
+    const credential = await enrollDeviceCertificate("https://api.example.com", {
+      ...tokenCredential,
+      apiUrl: "https://api.test-sg-sin-a.qualithm.com"
+    })
+
+    expect(credential.apiUrl).toBe("https://api.test-sg-sin-a.qualithm.com")
+  })
+
   it("throws EnrollError when the credential has no token", async () => {
     const certCredential: DeviceCredential = { ...tokenCredential, kind: "cert", token: undefined }
     await expect(

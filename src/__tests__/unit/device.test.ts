@@ -606,6 +606,37 @@ describe("Device with a claimed broker", () => {
     })
   })
 
+  it("claims at provisioningUrl and stores the API URL the claim names", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            deviceId: "d",
+            scopeId: "s",
+            teamId: "t",
+            secret: "qmd_n",
+            broker: { host: "gw.test-sg-sin-a.qualithm.com", port: 8883 },
+            apiUrl: "https://api.test-sg-sin-a.qualithm.com"
+          }
+        }),
+        { status: 201, headers: { "content-type": "application/json" } }
+      )
+    )
+    const store = createMemoryCredentialStore()
+    const device = new Device({
+      capabilities: [{ key: "power", type: "onoff" }],
+      provisioningUrl: "https://api.test.qualithm.com",
+      claimCode: "qmc_x.y",
+      store
+    })
+
+    await connectWith(device, new FakeMqttClient())
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("https://api.test.qualithm.com/v1/provision/claim")
+    // Persisted with the credential, so renewals after a restart go to the zone's API too.
+    expect((await store.load())?.apiUrl).toBe("https://api.test-sg-sin-a.qualithm.com")
+  })
+
   it("fails to connect when a stored credential predates the broker and none is configured", async () => {
     const device = new Device({
       capabilities: [{ key: "power", type: "onoff" }],

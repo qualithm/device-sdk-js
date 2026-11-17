@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises"
 import { parseArgs } from "node:util"
 
 import { claimCommand, connectCommand, provisionCommand } from "../cli/commands.js"
-import { printError, printResult } from "../cli/output.js"
+import { printError, printResult, printWarning } from "../cli/output.js"
 import { Device } from "../device.js"
 import { CapabilityError, QualithmDeviceError } from "../errors.js"
 import { createFileCredentialStore } from "../store.js"
@@ -94,7 +94,10 @@ async function runProvision(argv: string[]): Promise<void> {
     provisioningUrl,
     store,
     ...(values.label !== undefined && { label: values.label }),
-    ...(expiresInDays !== undefined && { expiresInDays })
+    ...(expiresInDays !== undefined && { expiresInDays }),
+    onFallback: (miss) => {
+      printWarning(json, miss)
+    }
   })
 
   printResult(json, `Enrolled certificate credential for ${credential.deviceId}`, credential)

@@ -129,6 +129,47 @@ describe("renewCredential (token)", () => {
     })
   })
 
+  it("takes the broker and API URL the renewal names", async () => {
+    vi.stubGlobal("fetch", async () =>
+      Promise.resolve(
+        respond(201, {
+          data: {
+            secret: "qmd_new",
+            broker: { host: "gw.sg-sin-a.qualithm.com", port: 8883 },
+            apiUrl: "https://api.sg-sin-a.qualithm.com"
+          }
+        })
+      )
+    )
+
+    const renewed = await renewCredential("https://api.example.com", {
+      ...token,
+      broker: { host: "gw.old.qualithm.com", port: 8883 },
+      apiUrl: "https://api.old.qualithm.com"
+    })
+
+    expect(renewed).toMatchObject({
+      token: "qmd_new",
+      broker: { host: "gw.sg-sin-a.qualithm.com", port: 8883 },
+      apiUrl: "https://api.sg-sin-a.qualithm.com"
+    })
+  })
+
+  it("keeps the stored broker and API URL when the renewal names none", async () => {
+    vi.stubGlobal("fetch", async () =>
+      Promise.resolve(respond(201, { data: { secret: "qmd_new" } }))
+    )
+    const stored: DeviceCredential = {
+      ...token,
+      broker: { host: "gw.sg-sin-a.qualithm.com", port: 8883 },
+      apiUrl: "https://api.sg-sin-a.qualithm.com"
+    }
+
+    const renewed = await renewCredential("https://api.example.com", stored)
+
+    expect(renewed).toMatchObject({ broker: stored.broker, apiUrl: stored.apiUrl })
+  })
+
   it("marks a credential that can't be renewed as final", async () => {
     vi.stubGlobal("fetch", async () =>
       Promise.resolve(
@@ -228,6 +269,44 @@ describe("renewCredential (certificate)", () => {
     )
     const current = new Uint8Array(await crypto.subtle.exportKey("spki", keys.publicKey))
     expect(requested).not.toEqual(current)
+  })
+
+  it("takes the API URL the certificate renewal names", async () => {
+    const { credential } = await certCredential(
+      new Date("2026-01-01T00:00:00Z"),
+      new Date("2026-01-31T00:00:00Z")
+    )
+    vi.stubGlobal("fetch", async () =>
+      Promise.resolve(
+        respond(201, {
+          data: { certificatePem: "NEW CERT", apiUrl: "https://api.sg-sin-a.qualithm.com" }
+        })
+      )
+    )
+
+    const renewed = await renewCredential("https://api.example.com", {
+      ...credential,
+      apiUrl: "https://api.old.qualithm.com"
+    })
+
+    expect(renewed.apiUrl).toBe("https://api.sg-sin-a.qualithm.com")
+  })
+
+  it("keeps the stored API URL when the certificate renewal names none", async () => {
+    const { credential } = await certCredential(
+      new Date("2026-01-01T00:00:00Z"),
+      new Date("2026-01-31T00:00:00Z")
+    )
+    vi.stubGlobal("fetch", async () =>
+      Promise.resolve(respond(201, { data: { certificatePem: "NEW CERT" } }))
+    )
+
+    const renewed = await renewCredential("https://api.example.com", {
+      ...credential,
+      apiUrl: "https://api.sg-sin-a.qualithm.com"
+    })
+
+    expect(renewed.apiUrl).toBe("https://api.sg-sin-a.qualithm.com")
   })
 
   it("refuses a certificate credential without its key", async () => {
