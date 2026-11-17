@@ -11,6 +11,7 @@ import type { Device } from "../device.js"
 import { enrollDeviceCertificate } from "../enroll.js"
 import { CredentialError } from "../errors.js"
 import type { CredentialStore, DeviceCredential } from "../types.js"
+import { atApiUrl } from "../url.js"
 
 export type ClaimCommandOptions = {
   code: string
@@ -34,12 +35,20 @@ export type ProvisionCommandOptions = {
   store: CredentialStore
   label?: string
   expiresInDays?: number
+  /**
+   * Told of the miss at the credential's API URL when `provisioningUrl` enrolled instead, once the
+   * new credential is saved.
+   */
+  onFallback?: (miss: Error) => void
 }
 
 /**
- * Upgrade the stored token credential to an mTLS certificate credential.
+ * Upgrade the stored token credential to an mTLS certificate credential, enrolling at the API URL
+ * the credential names, or at `provisioningUrl` when it names none. When the API URL gives no
+ * response or a server error (5xx), the enrollment goes once more to `provisioningUrl`.
  *
  * @throws {@link CredentialError} when no credential is stored yet.
+ * @throws `EnrollError` when enrollment fails.
  */
 export async function provisionCommand(
   options: ProvisionCommandOptions
@@ -49,11 +58,23 @@ export async function provisionCommand(
     throw new CredentialError("no stored credential: run `claim` first")
   }
 
-  const credential = await enrollDeviceCertificate(options.provisioningUrl, existing, {
-    ...(options.label !== undefined && { label: options.label }),
-    ...(options.expiresInDays !== undefined && { expiresInDays: options.expiresInDays })
-  })
+  let fallback: Error | undefined
+  const credential = await atApiUrl(
+    options.provisioningUrl,
+    existing,
+    async (baseUrl) =>
+      enrollDeviceCertificate(baseUrl, existing, {
+        ...(options.label !== undefined && { label: options.label }),
+        ...(options.expiresInDays !== undefined && { expiresInDays: options.expiresInDays })
+      }),
+    (missed) => {
+      fallback = missed
+    }
+  )
   await options.store.save(credential)
+  if (fallback !== undefined) {
+    options.onFallback?.(fallback)
+  }
   return credential
 }
 

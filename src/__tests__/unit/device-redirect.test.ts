@@ -125,6 +125,28 @@ describe("Device redirect", () => {
     })
   })
 
+  it("keeps the stored API URL when it follows a redirect", async () => {
+    const store = createMemoryCredentialStore()
+    await store.save({ ...credential, apiUrl: "https://api.test-sg-sin-a.example.com" })
+    const device = newDevice(store)
+    const refused = new FakeMqttClient()
+    const home = new FakeMqttClient()
+    queueClients(refused, home)
+
+    const pending = device.connect()
+    await tick()
+    refuse(refused, moved("gw.test-de-fra-a.example.com:8884"))
+    await tick()
+    await tick()
+    home.emit("connect", { properties: {} })
+    await pending
+
+    expect(await store.load()).toMatchObject({
+      broker: { host: "gw.test-de-fra-a.example.com", port: 8884 },
+      apiUrl: "https://api.test-sg-sin-a.example.com"
+    })
+  })
+
   it("follows 0x9C Use another server the same way", async () => {
     const store = await seededStore()
     const device = newDevice(store)

@@ -45,6 +45,7 @@ import type {
   DeviceCredential,
   DeviceOptions
 } from "./types.js"
+import { atApiUrl } from "./url.js"
 
 const DEFAULT_PORT = 8883
 const DEFAULT_RECONNECT_MS = 1000
@@ -507,16 +508,26 @@ export class Device {
   }
 
   /**
-   * Renew `credential` and store the new one, then switch to it. The old one
-   * stays in use, and stored, until the new one is saved. A failure is
-   * reported through `onError` and retried later.
+   * Renew `credential` at its zone's API URL, store the new one, then switch
+   * to it. The old one stays in use, and stored, until the new one is saved.
+   * A failure is reported through `onError` and retried later. No response
+   * or a server error (5xx) from the API URL is reported too, once
+   * `provisioningUrl` has renewed it and the new credential is saved.
    *
    * @returns the new credential, or the error when renewal failed
    */
   private async renew(credential: DeviceCredential): Promise<Renewal> {
     let renewed: DeviceCredential
+    let fallback: Error | undefined
     try {
-      renewed = await renewCredential(this.options.provisioningUrl, credential)
+      renewed = await atApiUrl(
+        this.options.provisioningUrl,
+        credential,
+        async (baseUrl) => renewCredential(baseUrl, credential),
+        (missed) => {
+          fallback = missed
+        }
+      )
       await this.store.save(renewed)
     } catch (error) {
       this.renewFailures += 1
@@ -530,6 +541,9 @@ export class Device {
     if (client !== null) {
       // The next reconnect presents the new credential.
       Object.assign(client.options, this.credentialOptions(renewed))
+    }
+    if (fallback !== undefined) {
+      this.emitError(fallback)
     }
     return { ok: true, credential: renewed }
   }

@@ -45,3 +45,13 @@ export function printError(json: boolean, error: unknown): void {
   }
   console.error(`Error: ${message}`)
 }
+
+/** Print a warning and its cause chain: a JSON line in `--json` mode, else `Warning: <message>`. */
+export function printWarning(json: boolean, warning: unknown): void {
+  const message = describeError(warning)
+  if (json) {
+    console.error(JSON.stringify({ warning: message }))
+    return
+  }
+  console.error(`Warning: ${message}`)
+}

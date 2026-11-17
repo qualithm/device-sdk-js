@@ -8,7 +8,7 @@
  * auth rather than a CONNECT packet's username/password fields.
  */
 
-import { parseBroker } from "./claim.js"
+import { zoneEndpoints } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { EnrollError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
@@ -26,6 +26,7 @@ type EnrollData = {
   certificatePem: string
   caCertificatePem: string
   broker?: unknown
+  apiUrl?: unknown
 }
 
 type EnrollEnvelope = {
@@ -47,7 +48,10 @@ const safeJson = async (response: Response): Promise<unknown> => {
  * returning a new {@link DeviceCredential} with `kind: "cert"` ready for
  * persistence and connecting.
  *
- * @param provisioningUrl - Base URL of the provisioning API.
+ * @param baseUrl - Base URL of the API to enroll at. The `qualithm-device`
+ *   CLI passes the credential's `apiUrl`, or the provisioning API when the
+ *   credential names none. When the `apiUrl` gives no response or a server
+ *   error (5xx), the CLI enrolls once more at the provisioning API.
  * @param credential - The device's existing token credential, used to
  *   authenticate the enrollment request.
  * @param request - Optional certificate label/lifetime.
@@ -55,7 +59,7 @@ const safeJson = async (response: Response): Promise<unknown> => {
  *   is unreachable or rejects the CSR.
  */
 export const enrollDeviceCertificate = async (
-  provisioningUrl: string,
+  baseUrl: string,
   credential: DeviceCredential,
   request?: EnrollRequest
 ): Promise<DeviceCredential> => {
@@ -66,7 +70,7 @@ export const enrollDeviceCertificate = async (
   }
 
   const keyMaterial = await generateDeviceCsr(credential.deviceId)
-  const url = `${trimTrailingSlash(provisioningUrl)}/v1/provision/credentials/cert`
+  const url = `${trimTrailingSlash(baseUrl)}/v1/provision/credentials/cert`
   const authorization = `Basic ${btoa(`${credential.deviceId}:${credential.token}`)}`
 
   let response: Response
@@ -90,8 +94,6 @@ export const enrollDeviceCertificate = async (
     throw new EnrollError(message, { status: response.status })
   }
 
-  // The platform names the broker again at enrollment; keep the claimed one if it doesn't.
-  const broker = parseBroker(data.broker) ?? credential.broker
   return {
     deviceId: credential.deviceId,
     teamId: credential.teamId,
@@ -101,6 +103,7 @@ export const enrollDeviceCertificate = async (
     certificatePem: data.certificatePem,
     caCertificatePem: data.caCertificatePem,
     issuedAt: new Date().toISOString(),
-    ...(broker !== undefined && { broker })
+    // The platform names the broker and API URL again at enrollment; keep the claimed ones if not.
+    ...zoneEndpoints(data, credential)
   }
 }

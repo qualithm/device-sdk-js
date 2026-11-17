@@ -47,7 +47,7 @@ describe("claimDevice", () => {
     expect(credential.broker).toEqual({ host: "gw.test-sg-sin-a.qualithm.com", port: 8883 })
   })
 
-  it("leaves the broker unset when an older platform omits it", async () => {
+  it("leaves the broker and API URL unset when an older platform omits them", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({ data: { deviceId: "d", scopeId: "s", teamId: "t", secret: "qmd_abc" } })
     )
@@ -55,6 +55,43 @@ describe("claimDevice", () => {
     const credential = await claimDevice("https://api.example.com", { code: "qmc_x.y" })
 
     expect(credential).not.toHaveProperty("broker")
+    expect(credential).not.toHaveProperty("apiUrl")
+  })
+
+  it("stores the API URL the platform returns for the device's zone", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        data: {
+          deviceId: "d",
+          scopeId: "s",
+          teamId: "t",
+          secret: "qmd_abc",
+          apiUrl: "https://api.test-sg-sin-a.qualithm.com/"
+        }
+      })
+    )
+
+    const credential = await claimDevice("https://api.test.qualithm.com", { code: "qmc_x.y" })
+
+    expect(credential.apiUrl).toBe("https://api.test-sg-sin-a.qualithm.com")
+  })
+
+  it("ignores an API URL that isn't an https origin", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        data: {
+          deviceId: "d",
+          scopeId: "s",
+          teamId: "t",
+          secret: "qmd_abc",
+          apiUrl: "http://localhost:3000"
+        }
+      })
+    )
+
+    const credential = await claimDevice("http://localhost:3000", { code: "qmc_x.y" })
+
+    expect(credential).not.toHaveProperty("apiUrl")
   })
 
   it("throws ClaimError on a non-2xx response", async () => {
