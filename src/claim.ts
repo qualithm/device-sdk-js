@@ -8,7 +8,7 @@
 
 import { ClaimError } from "./errors.js"
 import type { BrokerEndpoint, CredentialKind, DeviceCredential } from "./types.js"
-import { trimTrailingSlash } from "./url.js"
+import { parseApiUrl, trimTrailingSlash } from "./url.js"
 
 /** Body sent to the provisioning endpoint. */
 export type ClaimRequest = {
@@ -24,6 +24,7 @@ type ClaimData = {
   teamId: string
   secret: string
   broker?: unknown
+  apiUrl?: unknown
   credential?: {
     kind?: CredentialKind
     expiresAt?: string | null
@@ -55,6 +56,26 @@ export const parseBroker = (value: unknown): BrokerEndpoint | undefined => {
     return undefined
   }
   return { host, port }
+}
+
+/**
+ * The `broker` and `apiUrl` a provisioning response names for the device's zone. Each one the
+ * response omits, or names malformed, stays as `current` has it.
+ *
+ * @param data - The response's `data`
+ * @param current - The credential the response replaces, if any
+ * @returns The fields to spread into the new credential
+ */
+export const zoneEndpoints = (
+  data: { broker?: unknown; apiUrl?: unknown },
+  current?: DeviceCredential
+): Pick<DeviceCredential, "broker" | "apiUrl"> => {
+  const broker = parseBroker(data.broker) ?? current?.broker
+  const apiUrl = parseApiUrl(data.apiUrl) ?? current?.apiUrl
+  return {
+    ...(broker !== undefined && { broker }),
+    ...(apiUrl !== undefined && { apiUrl })
+  }
 }
 
 const safeJson = async (response: Response): Promise<unknown> => {
@@ -99,7 +120,6 @@ export const claimDevice = async (
     throw new ClaimError(message, { status: response.status })
   }
 
-  const broker = parseBroker(data.broker)
   return {
     deviceId: data.deviceId,
     teamId: data.teamId,
@@ -108,6 +128,6 @@ export const claimDevice = async (
     token: data.secret,
     issuedAt: new Date().toISOString(),
     ...(typeof data.credential?.expiresAt === "string" && { expiresAt: data.credential.expiresAt }),
-    ...(broker !== undefined && { broker })
+    ...zoneEndpoints(data)
   }
 }

@@ -23,6 +23,7 @@ async function main(): Promise<void> {
 
   const device = new Device({
     capabilities: [{ key: "temperature", type: "sensor", metric: "temperature", unit: "celsius" }],
+    // The device claims here; renewals go to the zone API URL the claim response names.
     provisioningUrl: process.env.QUALITHM_API ?? "https://api.qualithm.com",
     ...(gateway !== undefined && { broker: { host: gateway } }),
     ...(claimCode !== undefined && { claimCode })

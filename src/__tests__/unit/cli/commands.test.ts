@@ -102,6 +102,116 @@ describe("provisionCommand", () => {
     expect(credential.kind).toBe("cert")
     expect(await store.load()).toEqual(credential)
   })
+
+  it("enrolls at the API URL the stored credential names", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+      )
+    const store = createMemoryCredentialStore()
+    await store.save({ ...tokenCredential, apiUrl: "https://api.sg-sin-a.qualithm.com" })
+
+    const credential = await provisionCommand({
+      provisioningUrl: "https://api.qualithm.com",
+      store
+    })
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      "https://api.sg-sin-a.qualithm.com/v1/provision/credentials/cert"
+    )
+    expect(credential.apiUrl).toBe("https://api.sg-sin-a.qualithm.com")
+  })
+
+  it("enrolls at provisioningUrl when the stored API URL gives no response", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(
+        jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+      )
+    const store = createMemoryCredentialStore()
+    await store.save({ ...tokenCredential, apiUrl: "https://api.sg-sin-a.qualithm.com" })
+
+    const credential = await provisionCommand({
+      provisioningUrl: "https://api.qualithm.com",
+      store
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.sg-sin-a.qualithm.com/v1/provision/credentials/cert",
+      "https://api.qualithm.com/v1/provision/credentials/cert"
+    ])
+    expect(await store.load()).toEqual(credential)
+  })
+
+  it("tells onFallback of the miss once the enrolled credential is saved", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("{}", { status: 502 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+      )
+    const memory = createMemoryCredentialStore()
+    await memory.save({ ...tokenCredential, apiUrl: "https://api.sg-sin-a.qualithm.com" })
+    const events: string[] = []
+    const store: CredentialStore = {
+      load: async () => memory.load(),
+      save: async (saved) => {
+        events.push(`saved ${saved.kind}`)
+        await memory.save(saved)
+      },
+      clear: async () => memory.clear()
+    }
+
+    await provisionCommand({
+      provisioningUrl: "https://api.qualithm.com",
+      store,
+      onFallback: (miss) => {
+        events.push(`miss ${miss.message}`)
+      }
+    })
+
+    expect(events).toEqual([
+      "saved cert",
+      "miss https://api.sg-sin-a.qualithm.com answered 502: provisioningUrl answered instead"
+    ])
+  })
+
+  it("enrolls at provisioningUrl when the stored credential names no API URL", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+      )
+    const store = createMemoryCredentialStore()
+    await store.save(tokenCredential)
+
+    await provisionCommand({ provisioningUrl: "https://api.qualithm.com", store })
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      "https://api.qualithm.com/v1/provision/credentials/cert"
+    )
+  })
+
+  it("sends the certificate label and lifetime it is given", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        jsonResponse({ data: { certificatePem: "cert-pem", caCertificatePem: "ca-pem" } })
+      )
+    const store = createMemoryCredentialStore()
+    await store.save({ ...tokenCredential, apiUrl: "https://api.sg-sin-a.qualithm.com" })
+
+    await provisionCommand({
+      provisioningUrl: "https://api.qualithm.com",
+      store,
+      label: "primary",
+      expiresInDays: 30
+    })
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toMatchObject({ label: "primary", expiresInDays: 30 })
+  })
 })
 
 describe("connectCommand", () => {

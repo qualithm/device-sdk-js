@@ -76,6 +76,16 @@ Set `provisioningUrl` to the API of the environment the claim code came from:
 | Production  | `https://api.qualithm.com`      |
 | Test        | `https://api.test.qualithm.com` |
 
+The device claims at `provisioningUrl`. The claim response names the API URL for the device's zone,
+which the SDK stores with the credential. Renewals go to that URL, as does certificate enrollment
+with `qualithm-device provision`. A request that gets no response or a server error (5xx) there goes
+once more to `provisioningUrl`. `Device` reports that miss through `onError`. Any other HTTP error
+there, such as a refused credential, isn't sent to `provisioningUrl`. A credential stored by an
+earlier SDK version has no API URL, so it renews at `provisioningUrl` until a renewal stores one.
+
+Once a device has an API URL, changing `provisioningUrl` doesn't move it. To move a device to
+another environment, claim it again with a claim code from there.
+
 You don't configure the MQTT gateway. The claim response names the gateway for the device's zone,
 and the SDK stores it with the credential, so every later boot connects to the same gateway.
 `GET /zones` on the same API lists each zone's gateway. If a gateway answers that the device belongs
@@ -101,9 +111,10 @@ claimed broker has none, so it needs `broker.host` or a fresh claim.
   `publish()` rejects. Each QoS 1 message carries a `msg-id` user property that stays the same
   across its attempts, so the gateway stores it once. Set your own `msg-id` to choose the id.
 - **Credential renewal** — a credential that expires is renewed two thirds of the way through its
-  lifetime and stored before it's used, so a device that keeps running never needs claiming again. A
-  failed renewal keeps the old credential and retries. A device that was off past its credential's
-  expiry refuses to connect with a `CredentialError` that says to claim it again.
+  lifetime and stored before it's used, so a device that keeps running never needs claiming again.
+  The device renews at its zone's API URL. A failed renewal keeps the old credential and retries. A
+  device that was off past its credential's expiry refuses to connect with a `CredentialError` that
+  says to claim it again.
 - **Pluggable storage** — supply your own `CredentialStore` (flash/NVS, secure element, keychain)
   for constrained or hardened targets.
 
