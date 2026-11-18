@@ -258,7 +258,7 @@ describe("Device credential renewal", () => {
 
   it("renews at provisioningUrl when the API URL gives no response, and reports the miss", async () => {
     const fetchMock = vi.fn(async (url: string) =>
-      url.startsWith(ZONE_URL)
+      new URL(url).origin === ZONE_URL
         ? Promise.reject(new TypeError("fetch failed"))
         : Promise.resolve(renewedBody("qmd_new", Date.now()))
     )
@@ -290,7 +290,7 @@ describe("Device credential renewal", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) =>
-        url.startsWith(ZONE_URL)
+        new URL(url).origin === ZONE_URL
           ? Promise.reject(new TypeError("fetch failed"))
           : Promise.resolve(renewedBody("qmd_new", Date.now()))
       )
@@ -324,7 +324,7 @@ describe("Device credential renewal", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) =>
-        url.startsWith(ZONE_URL)
+        new URL(url).origin === ZONE_URL
           ? Promise.reject(new TypeError("fetch failed"))
           : Promise.resolve(renewedBody("qmd_new", Date.now()))
       )
@@ -378,7 +378,7 @@ describe("Device credential renewal", () => {
 
   it("renews at provisioningUrl when the API URL answers with a server error", async () => {
     const fetchMock = vi.fn(async (url: string) =>
-      url.startsWith(ZONE_URL)
+      new URL(url).origin === ZONE_URL
         ? Promise.resolve(
             new Response(JSON.stringify({ message: "origin unreachable" }), { status: 530 })
           )
