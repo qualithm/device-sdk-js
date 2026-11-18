@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { describeError, printError, printResult } from "../../../cli/output.js"
+import { describeError, printError, printResult, printWarning } from "../../../cli/output.js"
 
 describe("printResult", () => {
   afterEach(() => {
@@ -61,6 +61,27 @@ describe("printError", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined)
     printError(false, "plain string")
     expect(error).toHaveBeenCalledWith("Error: plain string")
+  })
+})
+
+describe("printWarning", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("prints a human warning with its cause on stderr by default", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    const cause = new Error("fetch failed")
+    printWarning(false, new Error("no response from https://api.sg-sin-a.qualithm.com", { cause }))
+    expect(error).toHaveBeenCalledWith(
+      "Warning: no response from https://api.sg-sin-a.qualithm.com: fetch failed"
+    )
+  })
+
+  it("prints a JSON warning line on stderr in --json mode", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    printWarning(true, new Error("no response"))
+    expect(error).toHaveBeenCalledWith(JSON.stringify({ warning: "no response" }))
   })
 })
 

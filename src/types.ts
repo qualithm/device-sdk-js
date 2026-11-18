@@ -47,10 +47,16 @@ export type DeviceCredential = {
   /** ISO-8601 expiry, when the credential is time-bounded. */
   expiresAt?: string
   /**
-   * The gateway the platform assigned for the device's zone at claim or certificate enrollment.
-   * Used when no broker host is configured.
+   * The gateway the platform assigned for the device's zone at claim, certificate enrollment or
+   * renewal. Used when no broker host is configured.
    */
   broker?: BrokerEndpoint
+  /**
+   * The https origin of the device's zone API, which the platform names at claim, certificate
+   * enrollment and renewal. Renewals go there. Unset in a credential from an older platform or SDK,
+   * which renews at {@link DeviceOptions.provisioningUrl}.
+   */
+  apiUrl?: string
 }
 
 /**
@@ -101,7 +107,12 @@ export type BrokerOptions = {
 
 /** Options for constructing a {@link Device}. */
 export type DeviceOptions = {
-  /** Provisioning API base URL for the device's environment, e.g. `https://api.qualithm.com`. */
+  /**
+   * Provisioning API base URL for the device's environment, e.g. `https://api.qualithm.com`. The
+   * claim goes here, and so does a renewal while the stored credential names no `apiUrl` or that
+   * URL gives no response or a server error (5xx). Once a device has an `apiUrl`, changing this
+   * doesn't move it to another environment: claim it again there.
+   */
   provisioningUrl: string
   /** MQTT gateway connection settings. The host defaults to the broker returned at enrollment. */
   broker?: BrokerOptions

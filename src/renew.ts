@@ -8,7 +8,7 @@ import "reflect-metadata"
 
 import * as x509 from "@peculiar/x509"
 
-import { parseBroker } from "./claim.js"
+import { zoneEndpoints } from "./claim.js"
 import { generateDeviceCsr } from "./csr.js"
 import { CredentialError, RenewalError } from "./errors.js"
 import type { DeviceCredential } from "./types.js"
@@ -84,6 +84,7 @@ type RenewEnvelope = {
   data?: {
     secret?: string
     broker?: unknown
+    apiUrl?: unknown
     credential?: { expiresAt?: string | null }
     certificatePem?: string
     caCertificatePem?: string
@@ -139,17 +140,20 @@ const post = async (
  * credential stays valid until it expires, so a renewal that is interrupted
  * leaves the device working.
  *
- * @param provisioningUrl - Base URL of the provisioning API
+ * @param baseUrl - Base URL of the API to renew at. {@link Device} passes the
+ *   credential's `apiUrl`, or its `provisioningUrl` when the credential names none. When the
+ *   `apiUrl` gives no response or a server error (5xx), `Device` renews once more at
+ *   `provisioningUrl`
  * @param credential - The credential in use
  * @param now - The current time, for the certificate proof
  * @throws {@link RenewalError} when the platform can't be reached or refuses
  */
 export const renewCredential = async (
-  provisioningUrl: string,
+  baseUrl: string,
   credential: DeviceCredential,
   now: () => number = Date.now
 ): Promise<DeviceCredential> => {
-  const url = `${trimTrailingSlash(provisioningUrl)}/v1/provision/credentials/renew`
+  const url = `${trimTrailingSlash(baseUrl)}/v1/provision/credentials/renew`
   const issuedAt = new Date(now()).toISOString()
 
   if (credential.kind === "cert") {
@@ -176,7 +180,6 @@ export const renewCredential = async (
     if (data.certificatePem === undefined) {
       throw new RenewalError("the renewal response carries no certificate")
     }
-    const broker = parseBroker(data.broker) ?? credential.broker
     const { expiresAt: _previousExpiry, ...current } = credential
     const certExpiresAt = data.credential?.expiresAt
     return {
@@ -186,7 +189,7 @@ export const renewCredential = async (
       ...(data.caCertificatePem !== undefined && { caCertificatePem: data.caCertificatePem }),
       issuedAt,
       ...(typeof certExpiresAt === "string" && { expiresAt: certExpiresAt }),
-      ...(broker !== undefined && { broker })
+      ...zoneEndpoints(data, credential)
     }
   }
 
@@ -208,6 +211,7 @@ export const renewCredential = async (
     ...rest,
     token: data.secret,
     issuedAt,
-    ...(typeof expiresAt === "string" && { expiresAt })
+    ...(typeof expiresAt === "string" && { expiresAt }),
+    ...zoneEndpoints(data, credential)
   }
 }
